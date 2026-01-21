@@ -170,10 +170,6 @@ dds <- DESeqDataSetFromMatrix(
   design = ~ construct
 )
 
-# Pre-filter low-count genes
-keep <- rowSums(counts(dds) >= 10) >= 3
-dds <- dds[keep, ]
-
 # Run DESeq2
 dds <- DESeq(dds)
 
@@ -719,7 +715,7 @@ This section compares your results with the published protoplast data from Taylo
 ```{r compare_datasets, fig.width=12, fig.height=10}
 # Load the published dataset
 # Place the file "ARFD_Up_Down_Regulated_LFC-1_p01_sorted.csv" in your working directory
-published_file <- "ARFD_Up_Down_Regulated_LFC-1_p01_sorted.csv"
+published_file <- "ARFD_Up_Down_Regulated_LFC-2_p01_sorted.csv"
 
 if (file.exists(published_file)) {
 
