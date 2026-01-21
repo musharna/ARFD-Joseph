@@ -712,6 +712,347 @@ if (reference_gene %in% df_DEGs_expr$Geneid) {
 }
 ```
 
+## Comparison with Published Data (Taylor et al.)
+
+This section compares your results with the published protoplast data from Taylor et al.
+
+```{r compare_datasets, fig.width=12, fig.height=10}
+# Load the published dataset
+# Place the file "ARFD_Up_Down_Regulated_LFC-1_p01_sorted.csv" in your working directory
+published_file <- "ARFD_Up_Down_Regulated_LFC-1_p01_sorted.csv"
+
+if (file.exists(published_file)) {
+
+  published_df <- read.csv(published_file, check.names = FALSE)
+
+  cat("=== Dataset Comparison ===\n\n")
+
+  # Map construct names between datasets
+  # Published: GUSaux_A, 5D_A, 6D_A, 7D_A, 8D_A, 19D_A
+  # Your data: GUS_aux, 5D, 6D, 7D, 8D, 19D
+  construct_map <- data.frame(
+    published = c("GUSaux_A", "5D_A", "6D_A", "7D_A", "8D_A", "19D_A"),
+    current = c("GUS_aux", "5D", "6D", "7D", "8D", "19D")
+  )
+
+  # Summary comparison table
+  comparison_summary <- data.frame(
+    Construct = construct_map$current,
+    Published_UP = NA,
+    Published_Down = NA,
+    Current_UP = NA,
+    Current_Down = NA
+  )
+
+  for (i in 1:nrow(construct_map)) {
+    pub_con <- construct_map$published[i]
+    cur_con <- construct_map$current[i]
+
+    pub_col <- paste0("Up_Down-", pub_con)
+    cur_col <- paste0("Up_Down-", cur_con)
+
+    if (pub_col %in% colnames(published_df)) {
+      comparison_summary$Published_UP[i] <- sum(published_df[[pub_col]] == "UP", na.rm = TRUE)
+      comparison_summary$Published_Down[i] <- sum(published_df[[pub_col]] == "Down", na.rm = TRUE)
+    }
+
+    if (cur_col %in% colnames(df2)) {
+      comparison_summary$Current_UP[i] <- sum(df2[[cur_col]] == "UP", na.rm = TRUE)
+      comparison_summary$Current_Down[i] <- sum(df2[[cur_col]] == "Down", na.rm = TRUE)
+    }
+  }
+
+  print(comparison_summary)
+
+  # Calculate overlap for each construct
+  cat("\n=== Gene Overlap Analysis ===\n\n")
+
+  overlap_results <- list()
+
+  for (i in 1:nrow(construct_map)) {
+    pub_con <- construct_map$published[i]
+    cur_con <- construct_map$current[i]
+
+    pub_col <- paste0("Up_Down-", pub_con)
+    cur_col <- paste0("Up_Down-", cur_con)
+
+    if (pub_col %in% colnames(published_df) && cur_col %in% colnames(df2)) {
+
+      # UP-regulated genes
+      pub_up <- published_df$Geneid[published_df[[pub_col]] == "UP"]
+      cur_up <- df2$Geneid[df2[[cur_col]] == "UP"]
+
+      # Down-regulated genes
+      pub_down <- published_df$Geneid[published_df[[pub_col]] == "Down"]
+      cur_down <- df2$Geneid[df2[[cur_col]] == "Down"]
+
+      # Calculate overlaps
+      up_overlap <- length(intersect(pub_up, cur_up))
+      down_overlap <- length(intersect(pub_down, cur_down))
+
+      # Jaccard similarity
+      up_jaccard <- up_overlap / length(union(pub_up, cur_up))
+      down_jaccard <- if(length(union(pub_down, cur_down)) > 0) {
+        down_overlap / length(union(pub_down, cur_down))
+      } else { NA }
+
+      overlap_results[[cur_con]] <- data.frame(
+        Construct = cur_con,
+        UP_Published = length(pub_up),
+        UP_Current = length(cur_up),
+        UP_Overlap = up_overlap,
+        UP_Jaccard = round(up_jaccard, 3),
+        Down_Published = length(pub_down),
+        Down_Current = length(cur_down),
+        Down_Overlap = down_overlap,
+        Down_Jaccard = round(down_jaccard, 3)
+      )
+
+      cat(sprintf("\n%s:\n", cur_con))
+      cat(sprintf("  UP: %d published, %d current, %d overlap (Jaccard: %.2f)\n",
+                  length(pub_up), length(cur_up), up_overlap, up_jaccard))
+      cat(sprintf("  Down: %d published, %d current, %d overlap (Jaccard: %.2f)\n",
+                  length(pub_down), length(cur_down), down_overlap,
+                  ifelse(is.na(down_jaccard), 0, down_jaccard)))
+    }
+  }
+
+  overlap_df <- bind_rows(overlap_results)
+  write.csv(overlap_df, "dataset_overlap_comparison.csv", row.names = FALSE)
+
+  # Visualize overlap with Venn diagrams for key constructs
+  library(ggVennDiagram)
+
+  # Create Venn diagrams for each construct
+  venn_plots <- list()
+
+  for (i in 1:nrow(construct_map)) {
+    pub_con <- construct_map$published[i]
+    cur_con <- construct_map$current[i]
+
+    pub_col <- paste0("Up_Down-", pub_con)
+    cur_col <- paste0("Up_Down-", cur_con)
+
+    if (pub_col %in% colnames(published_df) && cur_col %in% colnames(df2)) {
+
+      pub_up <- published_df$Geneid[published_df[[pub_col]] == "UP"]
+      cur_up <- df2$Geneid[df2[[cur_col]] == "UP"]
+
+      if (length(pub_up) > 0 && length(cur_up) > 0) {
+        venn_list <- list(
+          Published = pub_up,
+          Current = cur_up
+        )
+
+        p <- ggVennDiagram(venn_list, label_alpha = 0) +
+          scale_fill_gradient(low = "white", high = "#3498db") +
+          labs(title = paste(cur_con, "- UP-regulated genes")) +
+          theme(legend.position = "none")
+
+        venn_plots[[cur_con]] <- p
+      }
+    }
+  }
+
+  # Display Venn diagrams in a grid
+  if (length(venn_plots) > 0) {
+    library(patchwork)
+    combined_venn <- wrap_plots(venn_plots, ncol = 3)
+    print(combined_venn)
+    ggsave("venn_comparison_UP.svg", combined_venn, width = 12, height = 8)
+  }
+
+  # Correlation of fold changes between datasets
+  cat("\n=== Fold Change Correlation ===\n\n")
+
+  fc_correlations <- data.frame(
+    Construct = character(),
+    Pearson_r = numeric(),
+    Spearman_rho = numeric(),
+    N_genes = integer()
+  )
+
+  for (i in 1:nrow(construct_map)) {
+    pub_con <- construct_map$published[i]
+    cur_con <- construct_map$current[i]
+
+    pub_lfc <- paste0("log2FoldChange-", pub_con)
+    cur_lfc <- paste0("log2FoldChange-", cur_con)
+
+    if (pub_lfc %in% colnames(published_df) && cur_lfc %in% colnames(df2)) {
+
+      # Merge on gene ID
+      merged <- merge(
+        published_df[, c("Geneid", pub_lfc)],
+        df2[, c("Geneid", cur_lfc)],
+        by = "Geneid"
+      )
+
+      # Remove NAs
+      merged <- merged[complete.cases(merged), ]
+
+      if (nrow(merged) > 10) {
+        pearson_r <- cor(merged[[pub_lfc]], merged[[cur_lfc]], method = "pearson")
+        spearman_rho <- cor(merged[[pub_lfc]], merged[[cur_lfc]], method = "spearman")
+
+        fc_correlations <- rbind(fc_correlations, data.frame(
+          Construct = cur_con,
+          Pearson_r = round(pearson_r, 3),
+          Spearman_rho = round(spearman_rho, 3),
+          N_genes = nrow(merged)
+        ))
+
+        cat(sprintf("%s: Pearson r = %.3f, Spearman rho = %.3f (n = %d genes)\n",
+                    cur_con, pearson_r, spearman_rho, nrow(merged)))
+      }
+    }
+  }
+
+  print(fc_correlations)
+  write.csv(fc_correlations, "fold_change_correlations.csv", row.names = FALSE)
+
+  # Scatter plot of fold changes for ARF6 (the most active)
+  pub_lfc_6d <- "log2FoldChange-6D_A"
+  cur_lfc_6d <- "log2FoldChange-6D"
+
+  if (pub_lfc_6d %in% colnames(published_df) && cur_lfc_6d %in% colnames(df2)) {
+    merged_6d <- merge(
+      published_df[, c("Geneid", pub_lfc_6d)],
+      df2[, c("Geneid", cur_lfc_6d)],
+      by = "Geneid"
+    )
+    merged_6d <- merged_6d[complete.cases(merged_6d), ]
+
+    p_scatter <- ggplot(merged_6d, aes_string(x = paste0("`", pub_lfc_6d, "`"),
+                                               y = paste0("`", cur_lfc_6d, "`"))) +
+      geom_point(alpha = 0.3, size = 1) +
+      geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+      geom_smooth(method = "lm", color = "blue", se = TRUE) +
+      theme_bw() +
+      labs(
+        title = "ARF6Δ: Published vs Current Log2 Fold Changes",
+        x = "Published Log2FC (Protoplasts)",
+        y = "Current Log2FC (Your Data)"
+      ) +
+      coord_fixed()
+
+    print(p_scatter)
+    ggsave("fold_change_scatter_6D.svg", p_scatter, width = 8, height = 8)
+  }
+
+} else {
+  cat("Published data file not found. Please add 'ARFD_Up_Down_Regulated_LFC-1_p01_sorted.csv' to your working directory.\n")
+}
+```
+
+## Specific Gene Family Comparisons
+
+Compare expression of key auxin-responsive gene families between datasets.
+
+```{r gene_family_comparison, fig.width=14, fig.height=10}
+if (exists("published_df")) {
+
+  # Define gene families of interest
+  aux_iaa_genes <- c("AT4G14560", "AT1G04240", "AT1G04250", "AT2G22670", "AT1G15580",
+                     "AT1G52830", "AT3G23030", "AT2G33310", "AT1G04100", "AT1G04550",
+                     "AT4G28640", "AT1G80390", "AT2G46990", "AT4G14550", "AT1G51950",
+                     "AT3G04730", "AT1G04240", "AT3G16500", "AT3G62100", "AT2G01200",
+                     "AT4G29080", "AT1G19220", "AT4G32280", "AT3G17600", "AT1G15050",
+                     "AT3G15540", "AT5G43700", "AT1G73590", "AT2G33310")
+
+  tmo_genes <- c("AT1G68510", "AT5G57420", "AT5G60200", "AT2G36010")  # TMO3, TMO5, TMO6, TMO7
+
+  lbd_genes <- c("AT2G42430", "AT2G45420", "AT2G40470", "AT1G31320",  # LBD16, LBD17, LBD18, LBD4
+                 "AT5G66870", "AT3G02550", "AT4G00220", "AT2G42440")
+
+  # Function to compare a gene family
+  compare_gene_family <- function(genes, family_name, pub_df, cur_df) {
+
+    results <- data.frame()
+
+    for (i in 1:nrow(construct_map)) {
+      pub_con <- construct_map$published[i]
+      cur_con <- construct_map$current[i]
+
+      pub_lfc <- paste0("log2FoldChange-", pub_con)
+      cur_lfc <- paste0("log2FoldChange-", cur_con)
+      pub_ud <- paste0("Up_Down-", pub_con)
+      cur_ud <- paste0("Up_Down-", cur_con)
+
+      for (gene in genes) {
+        pub_row <- pub_df[pub_df$Geneid == gene, ]
+        cur_row <- cur_df[cur_df$Geneid == gene, ]
+
+        if (nrow(pub_row) > 0 && nrow(cur_row) > 0) {
+          results <- rbind(results, data.frame(
+            Gene = gene,
+            Construct = cur_con,
+            Published_LFC = ifelse(pub_lfc %in% colnames(pub_row), pub_row[[pub_lfc]], NA),
+            Current_LFC = ifelse(cur_lfc %in% colnames(cur_row), cur_row[[cur_lfc]], NA),
+            Published_UpDown = ifelse(pub_ud %in% colnames(pub_row), pub_row[[pub_ud]], ""),
+            Current_UpDown = ifelse(cur_ud %in% colnames(cur_row), cur_row[[cur_ud]], "")
+          ))
+        }
+      }
+    }
+
+    return(results)
+  }
+
+  # Compare TMO genes (TARGET OF MONOPTEROS)
+  tmo_comparison <- compare_gene_family(tmo_genes, "TMO", published_df, df2)
+
+  if (nrow(tmo_comparison) > 0) {
+    cat("\n=== TMO Gene Comparison ===\n")
+
+    tmo_wide <- tmo_comparison %>%
+      filter(!is.na(Published_LFC) & !is.na(Current_LFC)) %>%
+      mutate(
+        LFC_Diff = Current_LFC - Published_LFC,
+        Same_Direction = sign(Published_LFC) == sign(Current_LFC)
+      )
+
+    print(tmo_wide %>% select(Gene, Construct, Published_LFC, Current_LFC, LFC_Diff))
+
+    # Heatmap of TMO genes
+    tmo_heat_pub <- tmo_comparison %>%
+      filter(!is.na(Published_LFC)) %>%
+      select(Gene, Construct, Published_LFC) %>%
+      pivot_wider(names_from = Construct, values_from = Published_LFC) %>%
+      column_to_rownames("Gene")
+
+    tmo_heat_cur <- tmo_comparison %>%
+      filter(!is.na(Current_LFC)) %>%
+      select(Gene, Construct, Current_LFC) %>%
+      pivot_wider(names_from = Construct, values_from = Current_LFC) %>%
+      column_to_rownames("Gene")
+
+    if (nrow(tmo_heat_pub) > 1 && nrow(tmo_heat_cur) > 1) {
+      par(mfrow = c(1, 2))
+      pheatmap(as.matrix(tmo_heat_pub), main = "TMO Genes - Published",
+               cluster_rows = FALSE, cluster_cols = FALSE)
+      pheatmap(as.matrix(tmo_heat_cur), main = "TMO Genes - Current",
+               cluster_rows = FALSE, cluster_cols = FALSE)
+    }
+  }
+
+  # Compare LBD genes
+  lbd_comparison <- compare_gene_family(lbd_genes, "LBD", published_df, df2)
+
+  if (nrow(lbd_comparison) > 0) {
+    cat("\n=== LBD Gene Comparison ===\n")
+
+    lbd_wide <- lbd_comparison %>%
+      filter(!is.na(Published_LFC) & !is.na(Current_LFC))
+
+    print(lbd_wide %>% select(Gene, Construct, Published_LFC, Current_LFC))
+  }
+
+  write.csv(tmo_comparison, "TMO_gene_comparison.csv", row.names = FALSE)
+  write.csv(lbd_comparison, "LBD_gene_comparison.csv", row.names = FALSE)
+}
+```
+
 ## Session Info
 
 ```{r session_info}
