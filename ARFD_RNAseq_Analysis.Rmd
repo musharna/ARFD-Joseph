@@ -126,7 +126,14 @@ ggplot(lib_size_df, aes(x = Sample, y = Reads/1e6, fill = Construct)) +
 
 # PCA on raw counts (after log transformation)
 log_counts <- log2(counts_matrix + 1)
-pca_result <- prcomp(t(log_counts), scale. = TRUE)
+
+# Filter out genes with zero variance (constant expression) before PCA
+gene_vars <- apply(log_counts, 1, var)
+log_counts_filtered <- log_counts[gene_vars > 0, ]
+cat("Genes removed due to zero variance:", sum(gene_vars == 0), "\n")
+cat("Genes remaining for PCA:", nrow(log_counts_filtered), "\n")
+
+pca_result <- prcomp(t(log_counts_filtered), scale. = TRUE)
 
 pca_df <- data.frame(
   PC1 = pca_result$x[,1],
@@ -135,11 +142,16 @@ pca_df <- data.frame(
   Construct = sample_metadata$construct
 )
 
+# Calculate variance explained
+var_explained <- round(100 * pca_result$sdev^2 / sum(pca_result$sdev^2), 1)
+
 ggplot(pca_df, aes(x = PC1, y = PC2, color = Construct, label = Sample)) +
   geom_point(size = 3) +
   geom_text(vjust = -0.5, size = 3) +
   theme_bw() +
-  labs(title = "PCA of Raw Counts (log2 transformed)")
+  labs(title = "PCA of Raw Counts (log2 transformed)",
+       x = paste0("PC1 (", var_explained[1], "% variance)"),
+       y = paste0("PC2 (", var_explained[2], "% variance)"))
 ```
 
 ## DESeq2 Normalization and Differential Expression
