@@ -53,6 +53,24 @@ sample_metadata <- data.frame(
 # Create sample names in format "Construct-Replicate" (e.g., "GUS-1", "5D-2")
 sample_metadata$sample_name <- paste0(sample_metadata$construct, "-", sample_metadata$replicate)
 
+# =============================================================================
+# OUTLIER REMOVAL - Matching Joseph's analysis
+# =============================================================================
+# Joseph removed the following samples based on PCA analysis:
+# - GUS replicate 1 (sample 01)
+# - GUS_aux replicate 3 (sample 16)
+# - 5D replicate 2 (sample 10)
+# - 6D replicate 2 (sample 11)
+# - 7D replicate 3 (sample 19)
+# - 8D replicate 3 (sample 20)
+# - 19D replicate 3 (sample 21)
+
+outlier_samples <- c("01", "10", "11", "16", "19", "20", "21")
+sample_metadata <- sample_metadata[!sample_metadata$sample_num %in% outlier_samples, ]
+
+cat("Samples after outlier removal:", nrow(sample_metadata), "\n")
+cat("Removed samples:", paste(outlier_samples, collapse = ", "), "\n")
+
 # Define control construct (for differential expression comparisons)
 control_construct <- "GUS"
 
