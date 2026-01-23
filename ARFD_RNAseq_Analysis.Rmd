@@ -12,7 +12,7 @@ knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 
 ```{r libraries}
 # Install packages if needed (uncomment as needed)
-# BiocManager::install(c("DESeq2", "org.At.tair.db", "clusterProfiler", "GOSemSim"))
+# BiocManager::install(c("DESeq2", "org.At.tair.db", "clusterProfiler", "GOSemSim", "apeglm"))
 # install.packages(c("dplyr", "ggplot2", "pheatmap", "svglite", "ggrepel", "tidyr", "UpSetR", "eulerr"))
 
 library(dplyr)
@@ -20,6 +20,7 @@ library(pheatmap)
 library(ggplot2)
 library(svglite)
 library(DESeq2)
+library(apeglm)  # For LFC shrinkage
 library(tidyr)
 ```
 
@@ -170,6 +171,11 @@ dds <- DESeqDataSetFromMatrix(
   design = ~ construct
 )
 
+# Pre-filter low-count genes (matching Joseph's methodology)
+# Keep genes with >= 10 counts in at least 3 samples
+dds <- dds[rowSums(counts(dds) >= 10) >= 3, ]
+cat("Genes after pre-filtering:", nrow(dds), "\n")
+
 # Run DESeq2
 dds <- DESeq(dds)
 
@@ -206,11 +212,32 @@ cat("Created average columns for constructs:", all_constructs, "\n")
 
 ```{r differential_expression}
 # Extract DE results for each treatment vs control
+# Using LFC shrinkage with apeglm (matching Joseph's methodology)
 de_results_list <- list()
 
+# Get the coefficient names from DESeq2
+cat("Available coefficients:\n")
+print(resultsNames(dds))
+
 for (con in treatment_constructs) {
-  # Get DESeq2 results
-  res <- results(dds, contrast = c("construct", con, control_construct))
+  # Get initial DESeq2 results (for pvalue, padj, baseMean)
+  res <- results(dds, contrast = c("construct", con, control_construct),
+                 independentFiltering = TRUE, alpha = 0.05, pAdjustMethod = "BH")
+
+  # Construct the coefficient name for lfcShrink
+  coef_name <- paste0("construct_", con, "_vs_", control_construct)
+
+  # Apply LFC shrinkage using apeglm (if coefficient exists)
+  if (coef_name %in% resultsNames(dds)) {
+    lfc_shrunk <- lfcShrink(dds, coef = coef_name, type = "apeglm")
+    # Use shrunken LFC values
+    res$log2FoldChange <- lfc_shrunk$log2FoldChange
+    res$lfcSE <- lfc_shrunk$lfcSE
+    cat(sprintf("Applied apeglm shrinkage for %s\n", con))
+  } else {
+    cat(sprintf("Warning: Coefficient %s not found, using unshrunk LFC\n", coef_name))
+  }
+
   res_df <- as.data.frame(res)
   res_df$Geneid <- rownames(res_df)
 
@@ -237,25 +264,25 @@ for (con in treatment_constructs) {
 ## Classify Up/Down Regulated Genes
 
 ```{r classify_updown}
-# Define control average reads column
-control_col <- paste0("avg_reads-", control_construct)
-
 # Loop over treatment constructs to classify Up/Down
+# Using baseMean > 20 filter (matching Joseph's methodology)
+# baseMean is DESeq2's mean of normalized counts across ALL samples
+
 for (con in treatment_constructs) {
   l2fc_col <- paste0("log2FoldChange-", con)
   padj_col <- paste0("padj-", con)
-  avg_col <- paste0("avg_reads-", con)
+  basemean_col <- paste0("baseMean-", con)  # baseMean from DESeq2 results
   up_down_col <- paste0("Up_Down-", con)
 
-  # Classify based on thresholds:
+  # Classify based on thresholds (matching Joseph's methodology):
   # - padj < threshold
   # - |log2FoldChange| > lfc_threshold
-  # - average reads for treatment OR control > min_avg_reads
+  # - baseMean > 20 (DESeq2's overall average across all samples)
   df2[[up_down_col]] <- ifelse(
     !is.na(df2[[padj_col]]) &
       df2[[padj_col]] < padj_threshold &
       abs(df2[[l2fc_col]]) > lfc_threshold &
-      (df2[[avg_col]] > min_avg_reads | df2[[control_col]] > min_avg_reads),
+      df2[[basemean_col]] > min_avg_reads,
     ifelse(df2[[l2fc_col]] > 0, "UP", "Down"),
     ""
   )
