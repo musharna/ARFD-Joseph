@@ -1008,18 +1008,18 @@ if (exists("published_df")) {
         Same_Direction = sign(Published_LFC) == sign(Current_LFC)
       )
 
-    print(tmo_wide %>% select(Gene, Construct, Published_LFC, Current_LFC, LFC_Diff))
+    print(tmo_wide %>% dplyr::select(Gene, Construct, Published_LFC, Current_LFC, LFC_Diff))
 
     # Heatmap of TMO genes
     tmo_heat_pub <- tmo_comparison %>%
       filter(!is.na(Published_LFC)) %>%
-      select(Gene, Construct, Published_LFC) %>%
+      dplyr::select(Gene, Construct, Published_LFC) %>%
       pivot_wider(names_from = Construct, values_from = Published_LFC) %>%
       column_to_rownames("Gene")
 
     tmo_heat_cur <- tmo_comparison %>%
       filter(!is.na(Current_LFC)) %>%
-      select(Gene, Construct, Current_LFC) %>%
+      dplyr::select(Gene, Construct, Current_LFC) %>%
       pivot_wider(names_from = Construct, values_from = Current_LFC) %>%
       column_to_rownames("Gene")
 
@@ -1041,7 +1041,7 @@ if (exists("published_df")) {
     lbd_wide <- lbd_comparison %>%
       filter(!is.na(Published_LFC) & !is.na(Current_LFC))
 
-    print(lbd_wide %>% select(Gene, Construct, Published_LFC, Current_LFC))
+    print(lbd_wide %>% dplyr::select(Gene, Construct, Published_LFC, Current_LFC))
   }
 
   write.csv(tmo_comparison, "TMO_gene_comparison.csv", row.names = FALSE)
