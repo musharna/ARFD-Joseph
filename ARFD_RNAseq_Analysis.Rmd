@@ -63,7 +63,7 @@ treatment_constructs <- c("GUS_aux", "5D", "6D", "7D", "8D", "19D")
 
 # DEG thresholds
 padj_threshold <- 0.01      # Adjusted p-value cutoff
-lfc_threshold <- 2          # Log2 fold change cutoff (absolute value)
+lfc_threshold <- 1          # Log2 fold change cutoff (absolute value)
 min_avg_reads <- 20         # Minimum average normalized reads filter
 
 # Number of samples to use (samples 1-28 based on your input)
@@ -718,7 +718,7 @@ for (con in treatment_constructs) {
     if (!is.null(ego) && nrow(as.data.frame(ego)) > 0) {
       ego_df <- as.data.frame(ego) %>%
         arrange(p.adjust) %>%
-        head(30)
+        head(15)
       ego_df$Construct <- con
       all_enrichment_results[[con]] <- ego_df
     }
@@ -825,7 +825,7 @@ if ("Cluster" %in% colnames(df2)) {
       if (!is.null(ego_clust) && nrow(as.data.frame(ego_clust)) > 0) {
         ego_clust_df <- as.data.frame(ego_clust) %>%
           arrange(p.adjust) %>%
-          head(30)
+          head(15)
         ego_clust_df$Cluster <- as.character(clust)
         cluster_enrichment_results[[as.character(clust)]] <- ego_clust_df
       }
