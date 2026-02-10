@@ -397,7 +397,141 @@ if (exists("heat_all") && !is.null(heat_all$tree_row)) {
 }
 ```
 
-### Auxin-Responsive Genes Heatmap (GUS_aux DEGs)
+### Cluster Comparison with Joseph's Analysis
+
+```{r cluster_comparison, fig.width=10, fig.height=8}
+# install.packages("readxl")
+library(readxl)
+
+joseph_file <- "ARF567 clusters.xlsx"
+
+# Also try .xlxs in case of typo in filename
+if (!file.exists(joseph_file) && file.exists("ARF567 clusters.xlxs")) {
+  joseph_file <- "ARF567 clusters.xlxs"
+}
+
+if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
+
+  joseph_clusters <- read_excel(joseph_file)
+
+  # Confirm expected columns exist
+  if ("Geneid" %in% colnames(joseph_clusters) && "Gene_Cluster" %in% colnames(joseph_clusters)) {
+
+    # Join on Geneid - keep only genes present in both datasets
+    cluster_comparison <- df2 %>%
+      select(Geneid, Cluster) %>%
+      filter(!is.na(Cluster)) %>%
+      inner_join(
+        joseph_clusters %>% select(Geneid, Joseph_Cluster = Gene_Cluster),
+        by = "Geneid"
+      )
+
+    cat("Genes found in both datasets:", nrow(cluster_comparison), "\n")
+
+    # === Cross-tabulation table ===
+    cross_tab <- table(
+      My_Cluster    = cluster_comparison$Cluster,
+      Joseph_Cluster = cluster_comparison$Joseph_Cluster
+    )
+    cat("\nCluster overlap counts (rows = your clusters, cols = Joseph's clusters):\n")
+    print(cross_tab)
+
+    # === Normalised heatmap (proportion of each of YOUR clusters in Joseph's) ===
+    cross_mat <- as.matrix(cross_tab)
+    # Normalise each row so colours show what fraction of your cluster maps to each Joseph cluster
+    cross_norm <- cross_mat / rowSums(cross_mat)
+
+    svglite("Cluster_Comparison_Heatmap.svg", width = 10, height = 8)
+    pheatmap(
+      cross_norm,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      display_numbers = cross_mat,   # show raw counts on cells
+      number_format = "%d",
+      color = colorRampPalette(c("white", "#2C748E", "#440F57"))(50),
+      main = "Cluster Overlap: Your Clusters (rows) vs Joseph's Clusters (cols)\n(colour = proportion, numbers = gene count)",
+      fontsize_number = 9
+    )
+    dev.off()
+
+    pheatmap(
+      cross_norm,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      display_numbers = cross_mat,
+      number_format = "%d",
+      color = colorRampPalette(c("white", "#2C748E", "#440F57"))(50),
+      main = "Cluster Overlap: Your Clusters (rows) vs Joseph's Clusters (cols)\n(colour = proportion, numbers = gene count)",
+      fontsize_number = 9
+    )
+
+    # === Jaccard similarity for each pair of clusters ===
+    my_clusters      <- sort(unique(cluster_comparison$Cluster))
+    joseph_clusters_ids <- sort(unique(cluster_comparison$Joseph_Cluster))
+
+    jaccard_mat <- matrix(0,
+                          nrow = length(my_clusters),
+                          ncol = length(joseph_clusters_ids),
+                          dimnames = list(my_clusters, joseph_clusters_ids))
+
+    for (mc in my_clusters) {
+      for (jc in joseph_clusters_ids) {
+        genes_mine   <- cluster_comparison$Geneid[cluster_comparison$Cluster == mc]
+        genes_joseph <- cluster_comparison$Geneid[cluster_comparison$Joseph_Cluster == jc]
+        intersection <- length(intersect(genes_mine, genes_joseph))
+        union_size   <- length(union(genes_mine, genes_joseph))
+        jaccard_mat[as.character(mc), as.character(jc)] <- intersection / union_size
+      }
+    }
+
+    cat("\nJaccard similarity matrix (your clusters vs Joseph's):\n")
+    print(round(jaccard_mat, 3))
+
+    # Plot Jaccard heatmap
+    svglite("Cluster_Comparison_Jaccard.svg", width = 10, height = 8)
+    pheatmap(
+      jaccard_mat,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      display_numbers = TRUE,
+      number_format = "%.2f",
+      color = colorRampPalette(c("white", "#37B977", "#440F57"))(50),
+      main = "Jaccard Similarity: Your Clusters (rows) vs Joseph's Clusters (cols)"
+    )
+    dev.off()
+
+    pheatmap(
+      jaccard_mat,
+      cluster_rows = TRUE,
+      cluster_cols = TRUE,
+      display_numbers = TRUE,
+      number_format = "%.2f",
+      color = colorRampPalette(c("white", "#37B977", "#440F57"))(50),
+      main = "Jaccard Similarity: Your Clusters (rows) vs Joseph's Clusters (cols)"
+    )
+
+    # Save full mapping table
+    write.csv(cluster_comparison,
+              file = "Cluster_Comparison_Gene_Mapping.csv",
+              row.names = FALSE, quote = TRUE)
+
+    cat("\nBest matching Joseph cluster for each of your clusters:\n")
+    best_match <- apply(jaccard_mat, 1, function(x) {
+      data.frame(Best_Joseph_Cluster = names(which.max(x)),
+                 Jaccard = round(max(x), 3))
+    })
+    print(do.call(rbind, best_match))
+
+  } else {
+    cat("Expected columns 'Geneid' and 'Gene_Cluster' not found in Joseph's file.\n")
+    cat("Columns found:", paste(colnames(joseph_clusters), collapse = ", "), "\n")
+  }
+} else if (!file.exists(joseph_file)) {
+  cat("Joseph's cluster file not found. Place 'ARF567 clusters.xlsx' in the working directory.\n")
+} else {
+  cat("Cluster column not yet available in df2. Run the heatmap clustering section first.\n")
+}
+```
 
 ```{r heatmap_auxin_responsive, fig.width=10, fig.height=6}
 # Filter for genes differentially expressed in GUS_aux vs GUS
