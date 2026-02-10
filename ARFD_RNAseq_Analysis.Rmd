@@ -517,7 +517,7 @@ for (con in treatment_constructs) {
     pull(Geneid)
 }
 
-# UP-regulated UpSet plot
+# UP-regulated UpSet plot with enhanced formatting
 if (any(sapply(up_genes_list, length) > 0)) {
   upset_matrix_up <- fromList(up_genes_list)
 
@@ -527,6 +527,12 @@ if (any(sapply(up_genes_list, length) > 0)) {
     sets = treatment_constructs,
     keep.order = TRUE,
     order.by = "freq",
+    nintersects = 40,
+    mb.ratio = c(0.60, 0.40),
+    decreasing = TRUE,
+    point.size = 4,
+    line.size = 1.5,
+    text.scale = 1,
     mainbar.y.label = "UP-regulated gene intersections",
     sets.x.label = "Genes per construct"
   ))
@@ -537,12 +543,18 @@ if (any(sapply(up_genes_list, length) > 0)) {
     sets = treatment_constructs,
     keep.order = TRUE,
     order.by = "freq",
+    nintersects = 40,
+    mb.ratio = c(0.60, 0.40),
+    decreasing = TRUE,
+    point.size = 4,
+    line.size = 1.5,
+    text.scale = 1,
     mainbar.y.label = "UP-regulated gene intersections",
     sets.x.label = "Genes per construct"
   )
 }
 
-# DOWN-regulated UpSet plot
+# DOWN-regulated UpSet plot with enhanced formatting
 if (any(sapply(down_genes_list, length) > 0)) {
   upset_matrix_down <- fromList(down_genes_list)
 
@@ -552,6 +564,12 @@ if (any(sapply(down_genes_list, length) > 0)) {
     sets = treatment_constructs,
     keep.order = TRUE,
     order.by = "freq",
+    nintersects = 40,
+    mb.ratio = c(0.60, 0.40),
+    decreasing = TRUE,
+    point.size = 5,
+    line.size = 2,
+    text.scale = 1,
     mainbar.y.label = "DOWN-regulated gene intersections",
     sets.x.label = "Genes per construct"
   ))
@@ -562,17 +580,108 @@ if (any(sapply(down_genes_list, length) > 0)) {
     sets = treatment_constructs,
     keep.order = TRUE,
     order.by = "freq",
+    nintersects = 40,
+    mb.ratio = c(0.60, 0.40),
+    decreasing = TRUE,
+    point.size = 5,
+    line.size = 2,
+    text.scale = 1,
     mainbar.y.label = "DOWN-regulated gene intersections",
     sets.x.label = "Genes per construct"
   )
 }
 ```
 
+## Venn Diagrams
+
+```{r venn_diagrams, fig.width=10, fig.height=8}
+# Install eulerr if needed
+# install.packages("eulerr")
+library(eulerr)
+
+# UP-regulated Euler diagram
+if (any(sapply(up_genes_list, length) > 0)) {
+  fit_up <- euler(up_genes_list)
+
+  svglite("Venn_UP_regulated.svg", width = 10, height = 8)
+  plot(fit_up,
+       fills = list(fill = c("#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f"), alpha = 0.6),
+       labels = list(font = 2),
+       main = "UP-Regulated Gene Overlaps",
+       edges = TRUE)
+  dev.off()
+
+  plot(fit_up,
+       fills = list(fill = c("#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f"), alpha = 0.6),
+       labels = list(font = 2),
+       main = "UP-Regulated Gene Overlaps",
+       edges = TRUE)
+}
+
+# DOWN-regulated Euler diagram
+if (any(sapply(down_genes_list, length) > 0)) {
+  fit_down <- euler(down_genes_list)
+
+  svglite("Venn_DOWN_regulated.svg", width = 10, height = 8)
+  plot(fit_down,
+       fills = list(fill = c("#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f"), alpha = 0.6),
+       labels = list(font = 2),
+       main = "DOWN-Regulated Gene Overlaps",
+       edges = TRUE)
+  dev.off()
+
+  plot(fit_down,
+       fills = list(fill = c("#66c2a5","#fc8d62","#8da0cb","#e78ac3","#a6d854","#ffd92f"), alpha = 0.6),
+       labels = list(font = 2),
+       main = "DOWN-Regulated Gene Overlaps",
+       edges = TRUE)
+}
+```
+
+## Alternative Venn Diagrams with ggVennDiagram
+
+```{r venn_ggvenn, fig.width=10, fig.height=8}
+# install.packages("ggVennDiagram")
+library(ggVennDiagram)
+
+# For a subset of constructs (4-way comparison works best)
+venn_constructs <- c("5D", "6D", "7D", "8D")
+venn_up_list <- up_genes_list[venn_constructs]
+venn_down_list <- down_genes_list[venn_constructs]
+
+# UP-regulated ggVennDiagram
+if (any(sapply(venn_up_list, length) > 0)) {
+  p_venn_up <- ggVennDiagram(venn_up_list,
+                              category.names = venn_constructs,
+                              label = "count") +
+    scale_fill_gradient(low = "white", high = "red") +
+    labs(title = "UP-Regulated Genes")
+
+  print(p_venn_up)
+  ggsave("VennDiagram_UP_ggVenn.svg", plot = p_venn_up, height = 8, width = 10)
+}
+
+# DOWN-regulated ggVennDiagram
+if (any(sapply(venn_down_list, length) > 0)) {
+  p_venn_down <- ggVennDiagram(venn_down_list,
+                                category.names = venn_constructs,
+                                label = "count") +
+    scale_fill_gradient(low = "white", high = "blue") +
+    labs(title = "DOWN-Regulated Genes")
+
+  print(p_venn_down)
+  ggsave("VennDiagram_DOWN_ggVenn.svg", plot = p_venn_down, height = 8, width = 10)
+}
+```
+
 ## GO Term Enrichment Analysis
 
-```{r go_enrichment, fig.width=12, fig.height=10}
+### GO Enrichment by Construct
+
+```{r go_enrichment_construct, fig.width=12, fig.height=10}
 library(clusterProfiler)
 library(org.At.tair.db)
+library(GOSemSim)
 
 # Perform GO enrichment for each construct's UP-regulated genes
 all_enrichment_results <- list()
@@ -604,7 +713,7 @@ for (con in treatment_constructs) {
     if (!is.null(ego) && nrow(as.data.frame(ego)) > 0) {
       ego_df <- as.data.frame(ego) %>%
         arrange(p.adjust) %>%
-        head(15)
+        head(30)
       ego_df$Construct <- con
       all_enrichment_results[[con]] <- ego_df
     }
@@ -617,6 +726,37 @@ if (length(all_enrichment_results) > 0) {
   combined_enrichment$Construct <- factor(combined_enrichment$Construct,
                                           levels = treatment_constructs)
 
+  # === Semantic Similarity Clustering ===
+  # Create semantic data object for Arabidopsis
+  hsGO <- godata('org.At.tair.db', ont = "BP")
+
+  # Get unique GO IDs
+  unique_go <- unique(combined_enrichment$ID)
+
+  # Calculate pairwise semantic similarity
+  sim_matrix <- mgoSim(unique_go, unique_go, semData = hsGO, measure = "Wang", combine = "BMA")
+
+  # Handle single value case
+  if (is.numeric(sim_matrix) && length(sim_matrix) == 1) {
+    sim_matrix <- outer(unique_go, unique_go, Vectorize(function(x, y) {
+      goSim(x, y, semData = hsGO, measure = "Wang")
+    }))
+  }
+
+  # Convert to distance and cluster
+  dist_matrix <- as.dist(1 - sim_matrix)
+  hc <- hclust(dist_matrix, method = "average")
+  ordered_go <- hc$labels[hc$order]
+
+  # Reorder GO terms by clustering
+  go_order <- combined_enrichment %>%
+    distinct(ID, Description) %>%
+    arrange(match(ID, ordered_go)) %>%
+    pull(Description)
+
+  combined_enrichment$Description <- factor(combined_enrichment$Description, levels = go_order)
+
+  # Plot with semantic similarity ordering
   p_go <- ggplot(combined_enrichment, aes(
     x = Construct,
     y = Description,
@@ -624,6 +764,7 @@ if (length(all_enrichment_results) > 0) {
     color = -log10(p.adjust)
   )) +
     geom_point() +
+    scale_size(range = c(4, 12)) +
     scale_color_gradientn(colours = c("#440F57", "#424285", "#2C748E", "#37B977", "#FFCB27")) +
     theme_bw() +
     theme(
@@ -632,11 +773,114 @@ if (length(all_enrichment_results) > 0) {
       axis.title.y = element_blank(),
       axis.text.y = element_text(size = 8)
     ) +
-    labs(title = "GO Term Enrichment (UP-regulated genes)")
+    labs(title = "GO Term Enrichment (UP-regulated genes) - Semantically Clustered")
 
   print(p_go)
 
-  ggsave("GO_enrichment_UP.svg", plot = p_go, width = 12, height = 10)
+  ggsave("GO_enrichment_UP_semantically_clustered.svg", plot = p_go, width = 12, height = 10)
+
+  # Save results
+  write.csv(combined_enrichment, "GO_enrichment_by_construct.csv", row.names = FALSE, quote = TRUE)
+}
+```
+
+### GO Enrichment by Gene Cluster
+
+```{r go_enrichment_cluster, fig.width=12, fig.height=10}
+# Only run if we have cluster information
+if ("Cluster" %in% colnames(df2)) {
+
+  # Get unique clusters
+  clusters <- unique(df2$Cluster[!is.na(df2$Cluster)])
+
+  cluster_enrichment_results <- list()
+
+  for (clust in clusters) {
+    # Get genes in this cluster
+    cluster_genes <- df2 %>%
+      filter(Cluster == clust) %>%
+      pull(Geneid)
+
+    if (length(cluster_genes) >= 5) {
+      ego_clust <- tryCatch({
+        enrichGO(
+          gene = cluster_genes,
+          OrgDb = org.At.tair.db,
+          keyType = "TAIR",
+          ont = "BP",
+          pAdjustMethod = "BH",
+          pvalueCutoff = 0.05,
+          qvalueCutoff = 0.05
+        )
+      }, error = function(e) {
+        message(sprintf("No enrichment for cluster %s", clust))
+        return(NULL)
+      })
+
+      if (!is.null(ego_clust) && nrow(as.data.frame(ego_clust)) > 0) {
+        ego_clust_df <- as.data.frame(ego_clust) %>%
+          arrange(p.adjust) %>%
+          head(30)
+        ego_clust_df$Cluster <- as.character(clust)
+        cluster_enrichment_results[[as.character(clust)]] <- ego_clust_df
+      }
+    }
+  }
+
+  # Combine and plot
+  if (length(cluster_enrichment_results) > 0) {
+    combined_cluster_enrichment <- bind_rows(cluster_enrichment_results)
+
+    # Semantic similarity clustering
+    unique_go_clust <- unique(combined_cluster_enrichment$ID)
+
+    if (length(unique_go_clust) > 1) {
+      sim_matrix_clust <- mgoSim(unique_go_clust, unique_go_clust,
+                                  semData = hsGO, measure = "Wang", combine = "BMA")
+
+      if (is.numeric(sim_matrix_clust) && length(sim_matrix_clust) == 1) {
+        sim_matrix_clust <- outer(unique_go_clust, unique_go_clust, Vectorize(function(x, y) {
+          goSim(x, y, semData = hsGO, measure = "Wang")
+        }))
+      }
+
+      dist_matrix_clust <- as.dist(1 - sim_matrix_clust)
+      hc_clust <- hclust(dist_matrix_clust, method = "average")
+      ordered_go_clust <- hc_clust$labels[hc_clust$order]
+
+      go_order_clust <- combined_cluster_enrichment %>%
+        distinct(ID, Description) %>%
+        arrange(match(ID, ordered_go_clust)) %>%
+        pull(Description)
+
+      combined_cluster_enrichment$Description <- factor(combined_cluster_enrichment$Description,
+                                                        levels = go_order_clust)
+    }
+
+    p_go_cluster <- ggplot(combined_cluster_enrichment, aes(
+      x = Cluster,
+      y = Description,
+      size = Count,
+      color = -log10(p.adjust)
+    )) +
+      geom_point() +
+      scale_size(range = c(4, 12)) +
+      scale_color_gradientn(colours = c("#440F57", "#424285", "#2C748E", "#37B977", "#FFCB27")) +
+      theme_bw() +
+      theme(
+        axis.text.x = element_text(angle = 0, hjust = 0.5),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_text(size = 8)
+      ) +
+      labs(title = "GO Term Enrichment by Gene Cluster")
+
+    print(p_go_cluster)
+
+    ggsave("GO_enrichment_by_cluster.svg", plot = p_go_cluster, width = 12, height = 10)
+    write.csv(combined_cluster_enrichment, "GO_enrichment_by_cluster.csv",
+              row.names = FALSE, quote = TRUE)
+  }
 }
 ```
 
@@ -697,6 +941,598 @@ if (reference_gene %in% df_DEGs_expr$Geneid) {
               file = paste0(reference_gene, "_inverse_correlations.csv"),
               row.names = FALSE, quote = TRUE)
   }
+}
+```
+
+## Promoter Motif Analysis
+
+### MCAST Motif Cluster Analysis
+
+```{r mcast_analysis, eval=FALSE}
+# NOTE: This section requires MCAST output files
+# Run MCAST externally on promoter sequences, then analyze here
+
+library(Biostrings)
+
+# Function to find motif occurrences by regex
+find_motif_occurrences <- function(seq_string, motif_regex, orientation = "+") {
+  seq_string <- toupper(seq_string)
+  matches <- gregexpr(pattern = motif_regex, text = seq_string, perl = TRUE)
+
+  start_positions <- as.integer(matches[[1]])
+  if (start_positions[1] == -1) {
+    return(data.frame(start=integer(0), end=integer(0), orientation=character(0)))
+  } else {
+    match_lengths <- attr(matches[[1]], "match.length")
+    end_positions <- start_positions + match_lengths - 1
+    return(data.frame(
+      start = start_positions,
+      end   = end_positions,
+      orientation = orientation
+    ))
+  }
+}
+
+# Check if MCAST output exists
+mcast_file <- "Clustering/Motif_Analysis/mcast_output.tsv"
+if (file.exists(mcast_file)) {
+
+  # Read MCAST TSV
+  mcast_df <- read.table(mcast_file,
+                         header = TRUE,
+                         sep = "\t",
+                         stringsAsFactors = FALSE)
+
+  all_hits_df <- data.frame()
+
+  for (i in seq_len(nrow(mcast_df))) {
+    seq_id        <- mcast_df$sequence_name[i]
+    cluster_start <- mcast_df$start[i]
+    cluster_seq   <- mcast_df$matched_sequence[i]
+
+    # Find forward and reverse strand hits
+    fwd_hits <- find_motif_occurrences(cluster_seq, "TGTC[ACGT]{2}", orientation="+")
+    rev_hits <- find_motif_occurrences(cluster_seq, "[ACGT]{2}GACA", orientation="-")
+
+    cluster_hits <- rbind(fwd_hits, rev_hits)
+    if (nrow(cluster_hits) == 0) next
+
+    cluster_hits <- cluster_hits[order(cluster_hits$start), ]
+    cluster_hits$sequence_name <- seq_id
+    cluster_hits$cluster_row   <- i
+    cluster_hits$abs_start <- cluster_start + cluster_hits$start - 1
+    cluster_hits$abs_end   <- cluster_start + cluster_hits$end   - 1
+
+    # Extract motif sequence
+    cluster_seq_upper <- toupper(cluster_seq)
+    cluster_hits$motif_seq <- mapply(function(st, en, ori) {
+      raw_sub <- substring(cluster_seq_upper, st, en)
+      if (ori == "-") {
+        as.character(reverseComplement(DNAString(raw_sub)))
+      } else {
+        raw_sub
+      }
+    }, cluster_hits$start, cluster_hits$end, cluster_hits$orientation)
+
+    # Compute spacing to nearest neighbor
+    n_hits <- nrow(cluster_hits)
+    dist_to_right <- numeric(n_hits)
+    dist_to_left  <- numeric(n_hits)
+
+    for (j in seq_len(n_hits)) {
+      if (j < n_hits) {
+        dist_to_right[j] <- cluster_hits$abs_start[j+1] - cluster_hits$abs_end[j] - 1
+      } else {
+        dist_to_right[j] <- Inf
+      }
+
+      if (j > 1) {
+        dist_to_left[j] <- cluster_hits$abs_start[j] - cluster_hits$abs_end[j-1] - 1
+      } else {
+        dist_to_left[j] <- Inf
+      }
+    }
+
+    spacing_vec <- pmin(dist_to_left, dist_to_right, na.rm = TRUE)
+
+    # Classify orientation (DR, IR, ER)
+    classify_pair <- function(o1, o2) {
+      if (o1 == o2) {
+        return("DR")  # direct repeat
+      } else if (o1 == "+" && o2 == "-") {
+        return("IR")  # inverted repeat
+      } else if (o1 == "-" && o2 == "+") {
+        return("ER")  # everted repeat
+      }
+      return(NA_character_)
+    }
+
+    pair_type_vec <- rep(NA_character_, n_hits)
+
+    for (j in seq_len(n_hits)) {
+      left_d  <- dist_to_left[j]
+      right_d <- dist_to_right[j]
+
+      if (!is.finite(left_d) && !is.finite(right_d)) {
+        pair_type_vec[j] <- NA
+        next
+      }
+
+      if (left_d < right_d) {
+        pair_type_vec[j] <- classify_pair(
+          cluster_hits$orientation[j-1],
+          cluster_hits$orientation[j]
+        )
+      } else if (right_d < left_d) {
+        pair_type_vec[j] <- classify_pair(
+          cluster_hits$orientation[j],
+          cluster_hits$orientation[j+1]
+        )
+      } else if (is.finite(left_d) && left_d == right_d) {
+        pair_type_vec[j] <- NA
+      }
+    }
+
+    cluster_hits$spacing_to_nearest <- spacing_vec
+    cluster_hits$pair_type_to_nearest <- pair_type_vec
+
+    all_hits_df <- rbind(all_hits_df, cluster_hits)
+  }
+
+  # Save results
+  write.csv(all_hits_df, "Motif_Analysis_All_Hits.csv", row.names = FALSE, quote = TRUE)
+
+  # Summary by cluster
+  summary_by_cluster <- all_hits_df %>%
+    group_by(sequence_name, cluster_row) %>%
+    summarise(num_hits = n(),
+              avg_spacing = mean(spacing_to_nearest, na.rm=TRUE),
+              .groups = "drop")
+
+  write.csv(summary_by_cluster, "Motif_Analysis_Summary.csv", row.names = FALSE, quote = TRUE)
+
+  cat("Motif analysis complete. Results saved.\n")
+}
+```
+
+### Repeat Orientation Analysis
+
+```{r repeat_orientation, fig.width=8, fig.height=6, eval=FALSE}
+# Analyze repeat orientation patterns (DR/IR/ER)
+
+if (exists("all_hits_df") && nrow(all_hits_df) > 0) {
+
+  # Count orientation patterns
+  pair_counts <- all_hits_df %>%
+    filter(!is.na(pair_type_to_nearest)) %>%
+    group_by(pair_type_to_nearest) %>%
+    summarise(num_motifs = n(), .groups = "drop")
+
+  p_orientation <- ggplot(pair_counts, aes(x = pair_type_to_nearest, y = num_motifs,
+                                            fill = pair_type_to_nearest)) +
+    geom_bar(stat = "identity") +
+    labs(x = "Repeat Orientation",
+         y = "Number of Motifs",
+         title = "AuxRE Repeat Orientation Patterns") +
+    theme_minimal()
+
+  print(p_orientation)
+  ggsave("Repeat_Orientation_Barplot.svg", plot = p_orientation, width = 8, height = 6)
+
+  # Statistical test for orientation differences between clusters
+  if ("Cluster" %in% colnames(df2)) {
+    # Merge cluster info with motif data
+    all_hits_with_cluster <- all_hits_df %>%
+      left_join(df2 %>% select(Geneid, Cluster), by = c("sequence_name" = "Geneid"))
+
+    # Create contingency table
+    orientation_table <- all_hits_with_cluster %>%
+      filter(!is.na(pair_type_to_nearest) & !is.na(Cluster)) %>%
+      group_by(Cluster, pair_type_to_nearest) %>%
+      summarise(count = n(), .groups = "drop") %>%
+      pivot_wider(names_from = pair_type_to_nearest, values_from = count, values_fill = 0)
+
+    if (nrow(orientation_table) > 1) {
+      test_matrix <- as.matrix(orientation_table[, -1])
+      rownames(test_matrix) <- orientation_table$Cluster
+
+      # Chi-square test
+      chisq_result <- chisq.test(test_matrix)
+      print(chisq_result)
+
+      cat("\nExpected values:\n")
+      print(chisq_result$expected)
+    }
+  }
+}
+```
+
+### Coupling Element Identification
+
+```{r coupling_elements, eval=FALSE}
+# Identify and extract coupling elements (clusters of AuxREs within 30bp)
+
+library(Biostrings)
+
+# Function to find AuxRE motifs
+find_auxre_motifs <- function(sequence) {
+  sequence <- as.character(sequence)
+  auxre_fwd <- "TGTC[ACGT]{2}"
+  auxre_rev <- "[ACGT]{2}GACA"
+
+  fwd_matches <- gregexpr(auxre_fwd, sequence, perl=TRUE)[[1]]
+  rev_matches <- gregexpr(auxre_rev, sequence, perl=TRUE)[[1]]
+
+  motif_positions <- data.frame(
+    start = c(fwd_matches, rev_matches),
+    end = c(fwd_matches + 5, rev_matches + 5),
+    orientation = c(rep("+", length(fwd_matches)), rep("-", length(rev_matches)))
+  )
+
+  motif_positions <- motif_positions[motif_positions$start > 0, ]
+  return(motif_positions)
+}
+
+# Function to find clusters (≤30bp spacing)
+find_clusters <- function(motif_positions) {
+  if (nrow(motif_positions) < 2) {
+    return(NULL)
+  }
+
+  motif_positions <- motif_positions[order(motif_positions$start), ]
+  clusters <- list()
+  current_cluster <- c(motif_positions$start[1])
+
+  for (i in 2:nrow(motif_positions)) {
+    prev_motif <- motif_positions$start[i-1]
+    curr_motif <- motif_positions$start[i]
+
+    if ((curr_motif - prev_motif) <= 30) {
+      current_cluster <- c(current_cluster, curr_motif)
+    } else {
+      if (length(current_cluster) > 1) {
+        clusters <- append(clusters, list(range(current_cluster)))
+      }
+      current_cluster <- c(curr_motif)
+    }
+  }
+
+  if (length(current_cluster) > 1) {
+    clusters <- append(clusters, list(range(current_cluster)))
+  }
+
+  return(clusters)
+}
+
+# Function to extract cluster sequences with flanking regions
+extract_cluster_sequences <- function(sequence, clusters) {
+  extracted_sequences <- list()
+
+  for (cluster in clusters) {
+    cluster_start <- max(cluster[1] - 30, 1)
+    cluster_end <- min(cluster[2] + 30, nchar(sequence))
+
+    extracted_seq <- substr(sequence, cluster_start, cluster_end)
+    extracted_sequences <- append(extracted_sequences, list(extracted_seq))
+  }
+
+  return(extracted_sequences)
+}
+
+# Check if promoter FASTA file exists
+promoter_fasta <- "Clustering/promoter_sequences.fasta"
+if (file.exists(promoter_fasta)) {
+  fasta_file <- readDNAStringSet(promoter_fasta, format="fasta")
+  seq_list <- as.list(fasta_file)
+  seq_names <- names(fasta_file)
+
+  output_sequences <- list()
+
+  for (i in seq_along(seq_list)) {
+    gene_id <- seq_names[i]
+    sequence <- seq_list[[i]]
+
+    motif_positions <- find_auxre_motifs(sequence)
+
+    if (nrow(motif_positions) < 2) {
+      next
+    }
+
+    clusters <- find_clusters(motif_positions)
+
+    if (length(clusters) == 0) {
+      next
+    }
+
+    extracted_seqs <- extract_cluster_sequences(sequence, clusters)
+
+    for (j in seq_along(extracted_seqs)) {
+      output_sequences[[paste0(gene_id, "_cluster", j)]] <- extracted_seqs[[j]]
+    }
+  }
+
+  # Save coupling elements as FASTA
+  if (length(output_sequences) > 0) {
+    output_fasta <- DNAStringSet(output_sequences)
+    names(output_fasta) <- names(output_sequences)
+    writeXStringSet(output_fasta, "auxre_coupling_elements.fasta", format="fasta")
+    cat("Coupling elements extracted and saved to auxre_coupling_elements.fasta\n")
+  }
+}
+```
+
+### SEA Motif Enrichment Comparison
+
+```{r sea_comparison, fig.width=10, fig.height=8, eval=FALSE}
+# Compare SEA motif enrichment results between gene lists/clusters
+
+# Check for SEA output files
+sea_files <- list.files("Clustering/Motif_Analysis/Coupling_Elements",
+                        pattern = "_coupling_SEA.*\\.tsv$", full.names = TRUE)
+
+if (length(sea_files) >= 2) {
+
+  # Read first two SEA results for comparison
+  sea_list1 <- read.table(sea_files[1], header=TRUE, sep="\t", stringsAsFactors=FALSE)
+  sea_list2 <- read.table(sea_files[2], header=TRUE, sep="\t", stringsAsFactors=FALSE)
+
+  # Merge based on motif ID
+  sea_merged <- full_join(sea_list1, sea_list2, by="ID", suffix=c("_list1", "_list2"))
+
+  # Handle NAs
+  sea_merged$ENR_RATIO_list1[is.na(sea_merged$ENR_RATIO_list1)] <- 1
+  sea_merged$ENR_RATIO_list2[is.na(sea_merged$ENR_RATIO_list2)] <- 1
+  sea_merged$PVALUE_list1[is.na(sea_merged$PVALUE_list1)] <- 1
+  sea_merged$PVALUE_list2[is.na(sea_merged$PVALUE_list2)] <- 1
+
+  # Calculate log fold change
+  sea_merged$logFC <- log2(sea_merged$ENR_RATIO_list2 / sea_merged$ENR_RATIO_list1)
+
+  # Sort by absolute log-fold change
+  sea_merged <- sea_merged[order(abs(sea_merged$logFC), decreasing=TRUE),]
+
+  # Multiple testing correction
+  sea_merged$adjusted_pvalue <- p.adjust(sea_merged$PVALUE_list1, method="fdr")
+
+  # Volcano plot
+  p_volcano <- ggplot(sea_merged, aes(x=logFC, y=-log10(adjusted_pvalue))) +
+    geom_point(aes(color=adjusted_pvalue < 0.05)) +
+    geom_vline(xintercept=0, linetype="dashed") +
+    theme_minimal() +
+    labs(title="Motif Enrichment Differences",
+         x="Log2 Fold Change (List2 / List1)",
+         y="-Log10 Adjusted P-value")
+
+  print(p_volcano)
+  ggsave("SEA_Motif_Enrichment_Volcano.svg", plot = p_volcano, width = 10, height = 8)
+
+  # Bar plot of top differentially enriched motifs
+  top_motifs <- head(sea_merged, 20)
+
+  p_bar <- ggplot(top_motifs, aes(x=reorder(ID, logFC), y=logFC, fill=logFC > 0)) +
+    geom_bar(stat="identity") +
+    coord_flip() +
+    labs(title="Differential Motif Enrichment",
+         x="Motif ID", y="Log2 Fold Change (List2 / List1)") +
+    theme_minimal()
+
+  print(p_bar)
+  ggsave("SEA_Motif_Enrichment_Barplot.svg", plot = p_bar, width = 10, height = 8)
+
+  write.csv(sea_merged, "SEA_Motif_Comparison.csv", row.names = FALSE, quote = TRUE)
+}
+```
+
+## TF Deacon Enrichment Analysis
+
+```{r tf_deacon, fig.width=10, fig.height=10, eval=FALSE}
+# Transcription factor family enrichment using DEACoN
+
+library(scales)
+
+# Check for TF Deacon output files
+deacon_dir <- "TF_Deacon/ARFs"
+if (dir.exists(deacon_dir)) {
+  file_paths <- list.files(path = deacon_dir, pattern = "*.csv", full.names = TRUE)
+
+  if (length(file_paths) > 0) {
+    gene_list_names <- tools::file_path_sans_ext(basename(file_paths))
+
+    # Read and combine all DEACoN results
+    deacon_data <- map2_dfr(file_paths, gene_list_names, ~ read_csv(.x) %>%
+                              mutate(Gene_List = .y))
+
+    # Filter significant TFs
+    pval_cutoff <- 0.001
+    filtered <- deacon_data %>%
+      filter(adj.pval < pval_cutoff)
+
+    # Calculate total family size
+    family_sizes <- deacon_data %>%
+      group_by(family) %>%
+      summarise(total_family_size = n_distinct(tf.id))
+
+    # Fisher's combined p-value function
+    fisher_combined_p <- function(pvalues) {
+      chi_stat <- -2 * sum(log(pvalues))
+      df <- 2 * length(pvalues)
+      pchisq(chi_stat, df, lower.tail = FALSE)
+    }
+
+    # Summarize by gene list and family
+    summary_df <- filtered %>%
+      group_by(Gene_List, family) %>%
+      summarise(
+        n_significant = n(),
+        fisher_p = fisher_combined_p(pval),
+        .groups = "drop"
+      )
+
+    # Add family sizes and normalize
+    summary_df <- summary_df %>%
+      left_join(family_sizes, by = "family") %>%
+      mutate(
+        normalized_size = n_significant / total_family_size,
+        neglog10_fisher_p = -log10(fisher_p),
+        neglog10_fisher_p = ifelse(is.infinite(neglog10_fisher_p), 300, neglog10_fisher_p),
+        family = ifelse(is.na(family), "Undefined", family)
+      )
+
+    # Hierarchical clustering
+    clust_matrix <- summary_df %>%
+      select(Gene_List, family, neglog10_fisher_p) %>%
+      pivot_wider(names_from = Gene_List, values_from = neglog10_fisher_p, values_fill = 0) %>%
+      column_to_rownames(var = "family") %>%
+      as.matrix()
+
+    row_clust <- hclust(dist(clust_matrix))
+
+    summary_df <- summary_df %>%
+      mutate(family = factor(family, levels = row_clust$labels[row_clust$order]))
+
+    # Plot
+    p_tf <- ggplot(summary_df, aes(x = Gene_List, y = family)) +
+      geom_point(aes(size = normalized_size, color = neglog10_fisher_p)) +
+      scale_color_gradientn(colours = c("#0B0074","#6E0090","#B5296D","#E76E41","#FFCB27"),
+                            limits = c(0, 50), oob = squish) +
+      theme_minimal() +
+      labs(
+        title = "TF Family Enrichment across Gene Lists",
+        x = "Gene List",
+        y = "TF Family",
+        color = "-log10(Fisher's p)",
+        size = "Fraction of significant TFs"
+      ) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+    print(p_tf)
+    ggsave("TF_Deacon_Enrichment.svg", plot = p_tf, width = 10, height = 10)
+    write.csv(summary_df, "TF_Deacon_Summary.csv", row.names = FALSE, quote = TRUE)
+  }
+}
+```
+
+## External Dataset Integration
+
+### Cell Type-Specific Expression Data
+
+```{r cell_type_specific, fig.width=12, fig.height=10, eval=FALSE}
+# Overlay DEGs with cell type-specific expression data
+
+cell_type_file <- "Other_Datasets/Cell_Type_Specific_Data_auxin_responsive_BB.csv"
+if (file.exists(cell_type_file)) {
+  cell_type_specf <- read.csv(cell_type_file, check.names = FALSE)
+
+  # Remove unwanted samples (if needed)
+  cell_type_specf <- cell_type_specf[, 1:10]
+
+  # Define DEG sets based on your analysis
+  # Example: all upregulated genes
+  deg_genes <- df2 %>%
+    filter(if_any(all_of(ud_cols), ~ . %in% c("UP"))) %>%
+    pull(Geneid)
+
+  # Subset cell-type data to your DEGs
+  cell_type_subset <- cell_type_specf[cell_type_specf$GeneID %in% deg_genes, ]
+
+  if (nrow(cell_type_subset) > 0) {
+    # Create expression matrix
+    expr_mat <- as.matrix(cell_type_subset[, 3:10])
+    rownames(expr_mat) <- cell_type_subset$GeneID
+
+    # Heatmap
+    p_cell_type <- pheatmap(
+      expr_mat,
+      scale = "row",
+      main = "Cell Type-Specific Expression of DEGs",
+      show_rownames = FALSE,
+      show_colnames = TRUE,
+      cluster_cols = FALSE,
+      cluster_rows = TRUE
+    )
+
+    ggsave("Cell_Type_Specific_Expression.svg", plot = p_cell_type, width = 12, height = 10)
+  }
+}
+```
+
+### Okushima Dataset Comparison
+
+```{r okushima_comparison, eval=FALSE}
+# Compare with Okushima 2005 ARF mutant data
+
+okushima_file <- "Other_Datasets/Okushima2005.csv"
+if (file.exists(okushima_file)) {
+  okushima_data <- read.csv(okushima_file, check.names = FALSE)
+
+  # Get your DEGs
+  deg_genes <- df2 %>%
+    filter(if_any(all_of(ud_cols), ~ . %in% c("UP", "Down"))) %>%
+    pull(Geneid)
+
+  # Subset Okushima data
+  okushima_subset <- okushima_data[okushima_data$GeneID %in% deg_genes, ]
+
+  if (nrow(okushima_subset) > 0) {
+    # Overlap statistics
+    overlap_count <- length(intersect(deg_genes, okushima_data$GeneID))
+    total_genes <- 27000  # Arabidopsis genome size
+
+    # Fisher's exact test
+    cont_table <- matrix(c(
+      overlap_count,
+      length(deg_genes) - overlap_count,
+      nrow(okushima_data) - overlap_count,
+      total_genes - (length(deg_genes) + nrow(okushima_data) - overlap_count)
+    ), nrow = 2)
+
+    fisher_result <- fisher.test(cont_table, alternative = "greater")
+    cat("\n=== Overlap with Okushima Dataset ===\n")
+    cat("Overlap:", overlap_count, "genes\n")
+    cat("Fisher's exact test p-value:", fisher_result$p.value, "\n")
+
+    write.csv(okushima_subset, "Okushima_Overlap_Genes.csv", row.names = FALSE, quote = TRUE)
+  }
+}
+```
+
+### Dataset Overlap Venn Diagrams
+
+```{r dataset_overlap_venn, fig.width=8, fig.height=8, eval=FALSE}
+# Venn diagram comparing your DEGs with external datasets
+
+library(ggVennDiagram)
+
+# Your DEGs
+your_degs <- df2 %>%
+  filter(if_any(all_of(ud_cols), ~ . %in% c("UP", "Down"))) %>%
+  pull(Geneid)
+
+# Load external dataset gene lists (if available)
+external_lists <- list(
+  "Your_DEGs" = your_degs
+)
+
+# Add Okushima if available
+if (file.exists("Other_Datasets/Auxin_Induced_Okushima.csv")) {
+  okushima_list <- read.csv("Other_Datasets/Auxin_Induced_Okushima.csv")
+  external_lists[["Okushima"]] <- okushima_list$Geneid
+}
+
+# Add cell-type specific if available
+if (file.exists("Other_Datasets/Cell_Type_Specific_Data_auxin_responsive_BB.csv")) {
+  cell_type_list <- read.csv("Other_Datasets/Cell_Type_Specific_Data_auxin_responsive_BB.csv")
+  external_lists[["Cell_Type"]] <- cell_type_list$GeneID
+}
+
+if (length(external_lists) >= 2) {
+  p_venn_ext <- ggVennDiagram(external_lists, label_alpha = 0) +
+    labs(title = "Dataset Overlap Analysis") +
+    scale_fill_gradient(low = "white", high = "#83c441") +
+    theme(legend.position = "none")
+
+  print(p_venn_ext)
+  ggsave("Dataset_Overlap_Venn.svg", plot = p_venn_ext, width = 8, height = 8)
 }
 ```
 
