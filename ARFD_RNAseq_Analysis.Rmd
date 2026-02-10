@@ -892,6 +892,8 @@ if ("Cluster" %in% colnames(df2)) {
 ## Inverse Correlation Analysis
 
 ```{r inverse_correlation}
+library(tibble)
+
 # Find genes inversely correlated with a reference gene
 # Modify reference_gene as needed
 
