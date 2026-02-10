@@ -834,7 +834,7 @@ if ("Cluster" %in% colnames(df2)) {
       if (!is.null(ego_clust) && nrow(as.data.frame(ego_clust)) > 0) {
         ego_clust_df <- as.data.frame(ego_clust) %>%
           arrange(p.adjust) %>%
-          head(15)
+          head(5)
         ego_clust_df$Cluster <- as.character(clust)
         cluster_enrichment_results[[as.character(clust)]] <- ego_clust_df
       }
