@@ -68,6 +68,9 @@ min_avg_reads <- 20         # Minimum average normalized reads filter
 
 # Number of samples to use (samples 1-28 based on your input)
 n_samples <- 28
+
+# Outlier samples to exclude (sample numbers as integers)
+outlier_samples <- c(1, 10, 11, 16, 19, 20, 21)
 ```
 
 ## Data Import and Preprocessing
@@ -95,6 +98,11 @@ rownames(counts_matrix) <- raw_counts$Geneid
 # Simplify column names to just sample numbers
 colnames(counts_matrix) <- gsub(".*24250R-01-([0-9]+)_.*", "\\1", colnames(counts_matrix))
 
+# Remove outlier samples from metadata and counts matrix
+outlier_nums <- sprintf("%02d", outlier_samples)
+sample_metadata <- sample_metadata[!sample_metadata$sample_num %in% outlier_nums, ]
+counts_matrix <- counts_matrix[, !colnames(counts_matrix) %in% outlier_nums]
+
 # Reorder columns to match sample_metadata order
 counts_matrix <- counts_matrix[, sample_metadata$sample_num]
 
@@ -102,6 +110,7 @@ counts_matrix <- counts_matrix[, sample_metadata$sample_num]
 colnames(counts_matrix) <- sample_metadata$sample_name
 
 cat("Dimensions of counts matrix:", dim(counts_matrix), "\n")
+cat("Outliers removed:", paste(outlier_nums, collapse = ", "), "\n")
 cat("Sample names:", colnames(counts_matrix), "\n")
 ```
 
