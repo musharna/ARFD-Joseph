@@ -403,16 +403,28 @@ if (exists("heat_all") && !is.null(heat_all$tree_row)) {
 # install.packages("readxl")
 library(readxl)
 
-joseph_file <- "ARF567 clusters.xlsx"
+# Candidate files to look for (checked in order; first match wins)
+joseph_candidates <- c(
+  "ARFD_Up_Down_Regulated_LFC-1_p01_clustered(1).csv",
+  "ARFD_Up_Down_Regulated_LFC-1_p01_clustered.csv",
+  "ARF567 clusters.xlsx",
+  "ARF567 clusters.xlxs"   # typo variant
+)
 
-# Also try .xlxs in case of typo in filename
-if (!file.exists(joseph_file) && file.exists("ARF567 clusters.xlxs")) {
-  joseph_file <- "ARF567 clusters.xlxs"
+joseph_file <- NA_character_
+for (f in joseph_candidates) {
+  if (file.exists(f)) { joseph_file <- f; break }
 }
 
-if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
+if (!is.na(joseph_file) && "Cluster" %in% colnames(df2)) {
 
-  joseph_clusters <- read_excel(joseph_file)
+  # Load depending on file type
+  if (grepl("\\.csv$", joseph_file, ignore.case = TRUE)) {
+    joseph_clusters <- read.csv(joseph_file, check.names = FALSE, stringsAsFactors = FALSE)
+  } else {
+    joseph_clusters <- read_excel(joseph_file)
+  }
+  cat("Using reference file:", joseph_file, "\n")
 
   # Diagnostics: show what columns and how many genes are in Joseph's file
   cat("=== Joseph's file diagnostics ===\n")
@@ -563,8 +575,10 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
     cat("Expected columns 'Geneid' and 'Gene_Cluster' not found in Joseph's file.\n")
     cat("Columns found:", paste(colnames(joseph_clusters), collapse = ", "), "\n")
   }
-} else if (!file.exists(joseph_file)) {
-  cat("Joseph's cluster file not found. Place 'ARF567 clusters.xlsx' in the working directory.\n")
+} else if (is.na(joseph_file)) {
+  cat("Reference cluster file not found. Place one of the following in the working directory:\n")
+  cat("  - ARFD_Up_Down_Regulated_LFC-1_p01_clustered(1).csv\n")
+  cat("  - ARF567 clusters.xlsx\n")
 } else {
   cat("Cluster column not yet available in df2. Run the heatmap clustering section first.\n")
 }
