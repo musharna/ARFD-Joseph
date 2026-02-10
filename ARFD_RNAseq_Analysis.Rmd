@@ -444,8 +444,8 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
     svglite("Cluster_Comparison_Heatmap.svg", width = 10, height = 8)
     pheatmap(
       cross_norm,
-      cluster_rows = TRUE,
-      cluster_cols = TRUE,
+      cluster_rows = nrow(cross_norm) > 1,
+      cluster_cols = ncol(cross_norm) > 1,
       display_numbers = cross_mat,   # show raw counts on cells
       number_format = "%d",
       color = colorRampPalette(c("white", "#2C748E", "#440F57"))(50),
@@ -456,8 +456,8 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
 
     pheatmap(
       cross_norm,
-      cluster_rows = TRUE,
-      cluster_cols = TRUE,
+      cluster_rows = nrow(cross_norm) > 1,
+      cluster_cols = ncol(cross_norm) > 1,
       display_numbers = cross_mat,
       number_format = "%d",
       color = colorRampPalette(c("white", "#2C748E", "#440F57"))(50),
@@ -491,8 +491,8 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
     svglite("Cluster_Comparison_Jaccard.svg", width = 10, height = 8)
     pheatmap(
       jaccard_mat,
-      cluster_rows = TRUE,
-      cluster_cols = TRUE,
+      cluster_rows = nrow(jaccard_mat) > 1,
+      cluster_cols = ncol(jaccard_mat) > 1,
       display_numbers = TRUE,
       number_format = "%.2f",
       color = colorRampPalette(c("white", "#37B977", "#440F57"))(50),
@@ -502,8 +502,8 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
 
     pheatmap(
       jaccard_mat,
-      cluster_rows = TRUE,
-      cluster_cols = TRUE,
+      cluster_rows = nrow(jaccard_mat) > 1,
+      cluster_cols = ncol(jaccard_mat) > 1,
       display_numbers = TRUE,
       number_format = "%.2f",
       color = colorRampPalette(c("white", "#37B977", "#440F57"))(50),
