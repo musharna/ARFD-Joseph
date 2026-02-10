@@ -419,10 +419,10 @@ if (file.exists(joseph_file) && "Cluster" %in% colnames(df2)) {
 
     # Join on Geneid - keep only genes present in both datasets
     cluster_comparison <- df2 %>%
-      select(Geneid, Cluster) %>%
+      dplyr::select(Geneid, Cluster) %>%
       filter(!is.na(Cluster)) %>%
       inner_join(
-        joseph_clusters %>% select(Geneid, Joseph_Cluster = Gene_Cluster),
+        joseph_clusters %>% dplyr::select(Geneid, Joseph_Cluster = Gene_Cluster),
         by = "Geneid"
       )
 
