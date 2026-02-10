@@ -126,7 +126,12 @@ ggplot(lib_size_df, aes(x = Sample, y = Reads/1e6, fill = Construct)) +
 
 # PCA on raw counts (after log transformation)
 log_counts <- log2(counts_matrix + 1)
-pca_result <- prcomp(t(log_counts), scale. = TRUE)
+
+# Remove zero-variance genes before PCA (constant rows can't be scaled)
+gene_vars <- apply(log_counts, 1, var)
+log_counts_filtered <- log_counts[gene_vars > 0, ]
+
+pca_result <- prcomp(t(log_counts_filtered), scale. = TRUE)
 
 pca_df <- data.frame(
   PC1 = pca_result$x[,1],
