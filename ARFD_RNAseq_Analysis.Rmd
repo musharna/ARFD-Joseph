@@ -582,9 +582,31 @@ if (!is.na(joseph_file) && "Cluster" %in% colnames(df2)) {
 ### DEG Recovery Analysis — Why Were Joseph's DEGs Missed?
 
 ```{r deg_recovery_analysis, fig.width=12, fig.height=8}
-# Requires: joseph_clusters loaded above, de_results_list (full DESeq2 results), df2
-if (!is.na(joseph_file) && exists("joseph_clusters") &&
-    "Geneid" %in% colnames(joseph_clusters) && exists("de_results_list")) {
+# Load Joseph's reference file directly — does not depend on cluster_comparison chunk
+deg_rec_candidates <- c(
+  "ARFD_Up_Down_Regulated_LFC-1_p01_clustered(1).csv",
+  "ARFD_Up_Down_Regulated_LFC-1_p01_clustered.csv",
+  "ARF567 clusters.xlsx",
+  "ARF567 clusters.xlxs"
+)
+deg_rec_file <- NA_character_
+for (.f in deg_rec_candidates) {
+  if (file.exists(.f)) { deg_rec_file <- .f; break }
+}
+if (!is.na(deg_rec_file)) {
+  if (grepl("\\.csv$", deg_rec_file, ignore.case = TRUE)) {
+    joseph_clusters_rec <- read.csv(deg_rec_file, check.names = FALSE, stringsAsFactors = FALSE)
+  } else {
+    library(readxl)
+    joseph_clusters_rec <- as.data.frame(read_excel(deg_rec_file))
+  }
+} else {
+  joseph_clusters_rec <- NULL
+}
+
+if (!is.null(joseph_clusters_rec) &&
+    "Geneid" %in% colnames(joseph_clusters_rec) && exists("de_results_list")) {
+  joseph_clusters <- joseph_clusters_rec
 
   # --- Diagnostics: show what we're working with ---
   ud_j <- grep("^Up_Down-", colnames(joseph_clusters), value = TRUE)
@@ -799,7 +821,15 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   }
 
 } else {
-  cat("DEG recovery analysis requires: joseph_clusters (from cluster_comparison chunk) and de_results_list (from differential_expression chunk).\n")
+  if (is.null(joseph_clusters_rec)) {
+    cat("DEG recovery analysis: reference file not found. Place one of these in the working directory:\n")
+    cat(" ", paste(deg_rec_candidates, collapse = "\n  "), "\n")
+  } else if (!exists("de_results_list")) {
+    cat("DEG recovery analysis: de_results_list not found — re-run the differential_expression chunk.\n")
+  } else {
+    cat("DEG recovery analysis: 'Geneid' column not found in reference file.\n")
+    cat("Columns found:", paste(colnames(joseph_clusters_rec), collapse = ", "), "\n")
+  }
 }
 ```
 
