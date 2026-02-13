@@ -598,108 +598,104 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   cat("Up_Down columns in our df2:\n");        cat(" ", paste(ud_m, collapse="\n  "), "\n")
   cat("treatment_constructs:", paste(treatment_constructs, collapse=", "), "\n\n")
 
-  # Explicit mapping: our construct code → suffix used in Joseph's columns
-  # (derived from the Up_Down column names printed above)
-  j_suffix_map <- c(
-    "GUS_aux" = "GUSaux_A",
-    "5D"      = "5D_A",
-    "6D"      = "6D_A",
-    "7D"      = "7D_A",
-    "8D"      = "8D_A",
-    "19D"     = "19D_A"
+  # Hardcoded pairs: (our construct code, Joseph's column suffix, display label)
+  pairs <- list(
+    list(con="GUS_aux", jsuf="GUSaux_A", label="GUS_aux"),
+    list(con="5D",      jsuf="5D_A",     label="ARF5"),
+    list(con="6D",      jsuf="6D_A",     label="ARF6"),
+    list(con="7D",      jsuf="7D_A",     label="ARF7"),
+    list(con="8D",      jsuf="8D_A",     label="ARF8"),
+    list(con="19D",     jsuf="19D_A",    label="ARF19")
   )
+  # Only keep pairs whose construct is in this analysis
+  pairs <- Filter(function(p) p$con %in% treatment_constructs, pairs)
+  cat("Constructs to process:", paste(sapply(pairs, `[[`, "con"), collapse=", "), "\n\n")
 
-  construct_map <- data.frame(
-    my_code  = treatment_constructs,
-    j_suffix = j_suffix_map[treatment_constructs],
-    stringsAsFactors = FALSE
-  )
+  recovery_rows <- list()
+  missed_detail <- list()
 
-  cat("Construct mapping (our code → Joseph's column suffix):\n")
-  print(construct_map)
-  cat("\n")
+  for (p in pairs) {
+    con       <- p$con
+    jsuf      <- p$jsuf
+    con_label <- p$label
 
-  recovery_rows  <- list()
-  missed_detail  <- list()
+    tryCatch({
+      j_col  <- paste0("Up_Down-",        jsuf)
+      j_lfc  <- paste0("log2FoldChange-", jsuf)
+      j_padj <- paste0("padj-",           jsuf)
+      my_col <- paste0("Up_Down-",        con)
 
-  for (i in seq_len(nrow(construct_map))) {
-    con       <- construct_map$my_code[i]
-    j_suffix  <- construct_map$j_suffix[i]
-    con_label <- con   # use raw code; update below if mapping found
+      cat("Processing", con_label, "| j_col:", j_col, "| my_col:", my_col, "\n")
 
-    if (is.na(j_suffix)) {
-      cat("No matching column found in Joseph's file for construct:", con, "\n")
-      next
-    }
+      if (!j_col %in% colnames(joseph_clusters)) {
+        cat("  SKIP: column", j_col, "not found in Joseph's file\n"); return(invisible(NULL))
+      }
+      if (!my_col %in% colnames(df2)) {
+        cat("  SKIP: column", my_col, "not found in df2\n"); return(invisible(NULL))
+      }
 
-    j_col  <- paste0("Up_Down-",        j_suffix)
-    j_lfc  <- paste0("log2FoldChange-", j_suffix)
-    j_padj <- paste0("padj-",           j_suffix)
-    my_col <- paste0("Up_Down-",        con)
+      # Joseph DEGs for this construct
+      j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
+      j_down <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "Down"]
+      j_degs <- union(j_up, j_down)
+      cat("  Joseph DEGs: UP=", length(j_up), "Down=", length(j_down), "\n")
 
-    if (!j_col %in% colnames(joseph_clusters)) {
-      cat("Column not found in Joseph's file:", j_col, "(available:", paste(ud_j, collapse=", "), ")\n")
-      next
-    }
+      # Our DEGs
+      my_up   <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "UP"]))
+      my_down <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "Down"]))
+      my_degs <- union(my_up, my_down)
+      cat("  Our DEGs:    UP=", length(my_up), "Down=", length(my_down), "\n")
 
-    # Joseph DEGs for this construct
-    j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
-    j_down <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "Down"]
-    j_degs <- union(j_up, j_down)
+      missed <- setdiff(j_degs, my_degs)
 
-    # Our DEGs (from df2 Up_Down col)
-    my_up   <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "UP"]))
-    my_down <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "Down"]))
-    my_degs <- union(my_up, my_down)
+      recovery_rows[[con]] <- data.frame(
+        Construct    = con_label,
+        Joseph_UP    = length(j_up),
+        My_UP        = length(my_up),
+        Joseph_Down  = length(j_down),
+        My_Down      = length(my_down),
+        Missed_total = length(missed),
+        Recovery_pct = round(100 * length(intersect(j_degs, my_degs)) / max(length(j_degs), 1), 1),
+        stringsAsFactors = FALSE
+      )
 
-    missed <- setdiff(j_degs, my_degs)
+      # Categorise missed genes using full DESeq2 results
+      full_res <- de_results_list[[con]]
+      if (!is.null(full_res) && length(missed) > 0) {
+        lfc_col_full  <- paste0("log2FoldChange-", con)
+        padj_col_full <- paste0("padj-", con)
 
-    recovery_rows[[con]] <- data.frame(
-      Construct    = con_label,
-      Joseph_UP    = length(j_up),
-      My_UP        = length(my_up),
-      Joseph_Down  = length(j_down),
-      My_Down      = length(my_down),
-      Missed_total = length(missed),
-      Recovery_pct = round(100 * length(intersect(j_degs, my_degs)) / max(length(j_degs), 1), 1),
-      stringsAsFactors = FALSE
-    )
+        fr <- full_res %>%
+          dplyr::mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
+          dplyr::filter(Geneid_upper %in% missed) %>%
+          dplyr::select(Geneid_upper,
+                        my_lfc  = all_of(lfc_col_full),
+                        my_padj = all_of(padj_col_full))
 
-    # --- Categorise each missed gene using OUR full DESeq2 results ---
-    full_res <- de_results_list[[con]]
-    if (!is.null(full_res)) {
-      lfc_col_full  <- paste0("log2FoldChange-", con)
-      padj_col_full <- paste0("padj-", con)
+        jlv <- joseph_clusters %>%
+          dplyr::mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
+          dplyr::filter(Geneid_upper %in% missed) %>%
+          dplyr::select(Geneid_upper,
+                        joseph_lfc  = all_of(j_lfc),
+                        joseph_padj = all_of(j_padj))
 
-      # Keep only the columns needed — avoids rbind failure from construct-specific names
-      full_res <- full_res %>%
-        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
-        filter(Geneid_upper %in% missed) %>%
-        dplyr::select(Geneid_upper,
-                      my_lfc  = all_of(lfc_col_full),
-                      my_padj = all_of(padj_col_full))
-
-      # Also pull Joseph's LFC for these missed genes
-      joseph_lfc_vals <- joseph_clusters %>%
-        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
-        filter(Geneid_upper %in% missed) %>%
-        dplyr::select(Geneid_upper,
-                      joseph_lfc  = all_of(j_lfc),
-                      joseph_padj = all_of(j_padj))
-
-      detail <- full_res %>%
-        left_join(joseph_lfc_vals, by = "Geneid_upper") %>%
-        mutate(
-          Construct = con_label,
-          Category = case_when(
-            is.na(my_lfc)                              ~ "Not in our data (low counts/filtered)",
-            is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high (not significant)",
-            abs(my_lfc) < lfc_threshold                ~ paste0("LFC below threshold (|LFC| < ", lfc_threshold, ")"),
-            TRUE                                       ~ "Other / direction flip"
+        detail <- fr %>%
+          dplyr::left_join(jlv, by = "Geneid_upper") %>%
+          dplyr::mutate(
+            joseph_lfc = as.numeric(joseph_lfc),
+            Construct  = con_label,
+            Category   = dplyr::case_when(
+              is.na(my_lfc)                              ~ "Not in our data",
+              is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high",
+              abs(my_lfc) < lfc_threshold                ~ "LFC below threshold",
+              TRUE                                       ~ "Other"
+            )
           )
-        )
-      missed_detail[[con]] <- detail
-    }
+        missed_detail[[con]] <- detail
+      }
+    }, error = function(e) {
+      cat("  ERROR in", con_label, ":", conditionMessage(e), "\n")
+    })
   }
 
   # --- Summary table ---
