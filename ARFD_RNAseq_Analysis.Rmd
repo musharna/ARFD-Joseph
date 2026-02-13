@@ -679,16 +679,16 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     # --- Categorise each missed gene using OUR full DESeq2 results ---
     full_res <- de_results_list[[con]]
     if (!is.null(full_res)) {
-      full_res <- full_res %>%
-        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
-        filter(Geneid_upper %in% missed)
-
       lfc_col_full  <- paste0("log2FoldChange-", con)
       padj_col_full <- paste0("padj-", con)
 
+      # Keep only the columns needed — avoids rbind failure from construct-specific names
       full_res <- full_res %>%
-        rename(my_lfc  = all_of(lfc_col_full),
-               my_padj = all_of(padj_col_full))
+        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
+        filter(Geneid_upper %in% missed) %>%
+        dplyr::select(Geneid_upper,
+                      my_lfc  = all_of(lfc_col_full),
+                      my_padj = all_of(padj_col_full))
 
       # Also pull Joseph's LFC for these missed genes
       joseph_lfc_vals <- joseph_clusters %>%
@@ -703,10 +703,10 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
         mutate(
           Construct = con_label,
           Category = case_when(
-            is.na(my_lfc)                              ~ "Not in our data\n(low counts / filtered)",
-            is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high\n(not significant)",
-            abs(my_lfc) < lfc_threshold                ~ paste0("LFC below threshold\n(|LFC| < ", lfc_threshold, ")"),
-            TRUE                                       ~ "Other"
+            is.na(my_lfc)                              ~ "Not in our data (low counts/filtered)",
+            is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high (not significant)",
+            abs(my_lfc) < lfc_threshold                ~ paste0("LFC below threshold (|LFC| < ", lfc_threshold, ")"),
+            TRUE                                       ~ "Other / direction flip"
           )
         )
       missed_detail[[con]] <- detail
