@@ -64,7 +64,7 @@ treatment_constructs <- c("GUS_aux", "5D", "6D", "7D", "8D", "19D")
 # DEG thresholds
 padj_threshold <- 0.01      # Adjusted p-value cutoff
 lfc_threshold <- 1          # Log2 fold change cutoff (absolute value)
-min_avg_reads <- 20         # Minimum average normalized reads filter
+# min_avg_reads filter removed to match Joseph's pipeline (no equivalent filter)
 
 # Number of samples to use (samples 1-28 based on your input)
 n_samples <- 28
@@ -172,8 +172,8 @@ dds <- DESeqDataSetFromMatrix(
   design = ~ construct
 )
 
-# Pre-filter low-count genes
-keep <- rowSums(counts(dds) >= 10) >= 3
+# Pre-filter: remove genes with zero reads across all samples (matches Joseph's pipeline)
+keep <- rowSums(counts(dds)) >= 1
 dds <- dds[keep, ]
 
 # Run DESeq2
@@ -216,7 +216,7 @@ de_results_list <- list()
 
 for (con in treatment_constructs) {
   # Get DESeq2 results
-  res <- results(dds, contrast = c("construct", con, control_construct))
+  res <- results(dds, contrast = c("construct", con, control_construct), alpha = 0.05)
   res_df <- as.data.frame(res)
   res_df$Geneid <- rownames(res_df)
 
@@ -243,9 +243,6 @@ for (con in treatment_constructs) {
 ## Classify Up/Down Regulated Genes
 
 ```{r classify_updown}
-# Define control average reads column
-control_col <- paste0("avg_reads-", control_construct)
-
 # Loop over treatment constructs to classify Up/Down
 for (con in treatment_constructs) {
   l2fc_col <- paste0("log2FoldChange-", con)
@@ -253,15 +250,13 @@ for (con in treatment_constructs) {
   avg_col <- paste0("avg_reads-", con)
   up_down_col <- paste0("Up_Down-", con)
 
-  # Classify based on thresholds:
+  # Classify based on thresholds (matches Joseph's pipeline):
   # - padj < threshold
   # - |log2FoldChange| > lfc_threshold
-  # - average reads for treatment OR control > min_avg_reads
   df2[[up_down_col]] <- ifelse(
     !is.na(df2[[padj_col]]) &
       df2[[padj_col]] < padj_threshold &
-      abs(df2[[l2fc_col]]) > lfc_threshold &
-      (df2[[avg_col]] > min_avg_reads | df2[[control_col]] > min_avg_reads),
+      abs(df2[[l2fc_col]]) > lfc_threshold,
     ifelse(df2[[l2fc_col]] > 0, "UP", "Down"),
     ""
   )
