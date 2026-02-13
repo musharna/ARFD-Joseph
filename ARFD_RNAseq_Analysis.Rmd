@@ -772,19 +772,25 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
       na.action = na.pass
     )
     names(lfc_summary)[3] <- "median_joseph_lfc"
-    lfc_summary$n <- as.integer(table(
-      paste(detail_all$Construct, detail_all$Category)
-    )[paste(lfc_summary$Construct, lfc_summary$Category)])
+    # Count per Construct+Category using plain table on the factor columns
+    count_tbl <- table(detail_all$Construct, detail_all$Category)
+    lfc_summary$n <- mapply(function(con, cat) {
+      if (con %in% rownames(count_tbl) && cat %in% colnames(count_tbl))
+        as.integer(count_tbl[con, cat])
+      else
+        NA_integer_
+    }, lfc_summary$Construct, lfc_summary$Category)
     cat("lfc_summary nrow:", nrow(lfc_summary), "\n")
     cat(sprintf("%-10s  %-25s  %18s  %5s\n",
                 "Construct", "Category", "Median_Joseph_LFC", "n"))
     cat(strrep("-", 65), "\n")
     for (i in seq_len(nrow(lfc_summary))) {
-      cat(sprintf("%-10s  %-25s  %18.2f  %5d\n",
+      n_val <- lfc_summary$n[i]
+      cat(sprintf("%-10s  %-25s  %18.2f  %s\n",
                   lfc_summary$Construct[i],
                   lfc_summary$Category[i],
                   lfc_summary$median_joseph_lfc[i],
-                  lfc_summary$n[i]))
+                  if (is.na(n_val)) "   NA" else sprintf("%5d", n_val)))
     }
     write.csv(lfc_summary, "DEG_Recovery_LFC_Summary.csv", row.names = FALSE)
   }
