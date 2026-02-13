@@ -591,18 +591,44 @@ if (!is.na(joseph_file) && "Cluster" %in% colnames(df2)) {
 if (!is.na(joseph_file) && exists("joseph_clusters") &&
     "Geneid" %in% colnames(joseph_clusters) && exists("de_results_list")) {
 
-  # Map OUR construct codes → Joseph's column suffix and display label
-  # Our codes:   GUS_aux, 5D, 6D, 7D, 8D, 19D
-  # Joseph cols: GUSaux_A, 5D_A, 6D_A, 7D_A, 8D_A, 19D_A
-  construct_map <- data.frame(
-    my_code  = treatment_constructs,
-    j_suffix = c("GUSaux_A", "5D_A", "6D_A", "7D_A", "8D_A", "19D_A"),
-    label    = c("GUS_aux",  "ARF5Δ","ARF6Δ","ARF7Δ","ARF8Δ","ARF19Δ"),
-    stringsAsFactors = FALSE
-  )
+  # --- Diagnostics: show what we're working with ---
+  ud_j <- grep("^Up_Down-", colnames(joseph_clusters), value = TRUE)
+  ud_m <- grep("^Up_Down-", colnames(df2), value = TRUE)
+  cat("Up_Down columns in Joseph's file:\n"); cat(" ", paste(ud_j, collapse="\n  "), "\n")
+  cat("Up_Down columns in our df2:\n");        cat(" ", paste(ud_m, collapse="\n  "), "\n")
+  cat("treatment_constructs:", paste(treatment_constructs, collapse=", "), "\n\n")
 
-  # Normalise Geneids for matching
-  joseph_ids <- toupper(trimws(joseph_clusters$Geneid))
+  # --- Auto-detect mapping: find which Joseph Up_Down col matches each of our constructs ---
+  # Strip "Up_Down-" prefix from both sets, then try to fuzzy-match
+  j_suffixes <- sub("^Up_Down-", "", ud_j)   # e.g. GUSaux_A, 5D_A, ...
+  m_suffixes <- sub("^Up_Down-", "", ud_m)   # e.g. GUS_aux, 5D, ...
+
+  # Build mapping by stripping non-alphanumeric chars and matching case-insensitively
+  strip <- function(x) tolower(gsub("[^a-zA-Z0-9]", "", x))
+
+  construct_map <- do.call(rbind, lapply(treatment_constructs, function(con) {
+    con_stripped <- strip(con)
+    # find best match in joseph's suffixes
+    match_idx <- which(strip(j_suffixes) == con_stripped)
+    if (length(match_idx) == 0) {
+      # fallback: partial match (e.g. "gusaux" in "gusauxa")
+      match_idx <- which(startsWith(strip(j_suffixes), con_stripped) |
+                         startsWith(con_stripped, strip(j_suffixes)))
+    }
+    if (length(match_idx) > 0) {
+      data.frame(my_code  = con,
+                 j_suffix = j_suffixes[match_idx[1]],
+                 stringsAsFactors = FALSE)
+    } else {
+      data.frame(my_code  = con,
+                 j_suffix = NA_character_,
+                 stringsAsFactors = FALSE)
+    }
+  }))
+
+  cat("Construct mapping (our code → Joseph's column suffix):\n")
+  print(construct_map)
+  cat("\n")
 
   recovery_rows  <- list()
   missed_detail  <- list()
@@ -610,7 +636,12 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   for (i in seq_len(nrow(construct_map))) {
     con       <- construct_map$my_code[i]
     j_suffix  <- construct_map$j_suffix[i]
-    con_label <- construct_map$label[i]
+    con_label <- con   # use raw code; update below if mapping found
+
+    if (is.na(j_suffix)) {
+      cat("No matching column found in Joseph's file for construct:", con, "\n")
+      next
+    }
 
     j_col  <- paste0("Up_Down-",        j_suffix)
     j_lfc  <- paste0("log2FoldChange-", j_suffix)
@@ -618,7 +649,7 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     my_col <- paste0("Up_Down-",        con)
 
     if (!j_col %in% colnames(joseph_clusters)) {
-      cat("Column not found in Joseph's file:", j_col, "\n")
+      cat("Column not found in Joseph's file:", j_col, "(available:", paste(ud_j, collapse=", "), ")\n")
       next
     }
 
