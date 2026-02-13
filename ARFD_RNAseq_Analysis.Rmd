@@ -598,33 +598,22 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   cat("Up_Down columns in our df2:\n");        cat(" ", paste(ud_m, collapse="\n  "), "\n")
   cat("treatment_constructs:", paste(treatment_constructs, collapse=", "), "\n\n")
 
-  # --- Auto-detect mapping: find which Joseph Up_Down col matches each of our constructs ---
-  # Strip "Up_Down-" prefix from both sets, then try to fuzzy-match
-  j_suffixes <- sub("^Up_Down-", "", ud_j)   # e.g. GUSaux_A, 5D_A, ...
-  m_suffixes <- sub("^Up_Down-", "", ud_m)   # e.g. GUS_aux, 5D, ...
+  # Explicit mapping: our construct code → suffix used in Joseph's columns
+  # (derived from the Up_Down column names printed above)
+  j_suffix_map <- c(
+    "GUS_aux" = "GUSaux_A",
+    "5D"      = "5D_A",
+    "6D"      = "6D_A",
+    "7D"      = "7D_A",
+    "8D"      = "8D_A",
+    "19D"     = "19D_A"
+  )
 
-  # Build mapping by stripping non-alphanumeric chars and matching case-insensitively
-  strip <- function(x) tolower(gsub("[^a-zA-Z0-9]", "", x))
-
-  construct_map <- do.call(rbind, lapply(treatment_constructs, function(con) {
-    con_stripped <- strip(con)
-    # find best match in joseph's suffixes
-    match_idx <- which(strip(j_suffixes) == con_stripped)
-    if (length(match_idx) == 0) {
-      # fallback: partial match (e.g. "gusaux" in "gusauxa")
-      match_idx <- which(startsWith(strip(j_suffixes), con_stripped) |
-                         startsWith(con_stripped, strip(j_suffixes)))
-    }
-    if (length(match_idx) > 0) {
-      data.frame(my_code  = con,
-                 j_suffix = j_suffixes[match_idx[1]],
-                 stringsAsFactors = FALSE)
-    } else {
-      data.frame(my_code  = con,
-                 j_suffix = NA_character_,
-                 stringsAsFactors = FALSE)
-    }
-  }))
+  construct_map <- data.frame(
+    my_code  = treatment_constructs,
+    j_suffix = j_suffix_map[treatment_constructs],
+    stringsAsFactors = FALSE
+  )
 
   cat("Construct mapping (our code → Joseph's column suffix):\n")
   print(construct_map)
