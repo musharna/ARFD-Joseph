@@ -780,7 +780,18 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     lfc_summary$n <- as.integer(table(
       paste(detail_all$Construct, detail_all$Category)
     )[paste(lfc_summary$Construct, lfc_summary$Category)])
-    print(lfc_summary)
+    cat("lfc_summary nrow:", nrow(lfc_summary), "\n")
+    cat(sprintf("%-10s  %-25s  %18s  %5s\n",
+                "Construct", "Category", "Median_Joseph_LFC", "n"))
+    cat(strrep("-", 65), "\n")
+    for (i in seq_len(nrow(lfc_summary))) {
+      cat(sprintf("%-10s  %-25s  %18.2f  %5d\n",
+                  lfc_summary$Construct[i],
+                  lfc_summary$Category[i],
+                  lfc_summary$median_joseph_lfc[i],
+                  lfc_summary$n[i]))
+    }
+    write.csv(lfc_summary, "DEG_Recovery_LFC_Summary.csv", row.names = FALSE)
   }
 
 } else {
