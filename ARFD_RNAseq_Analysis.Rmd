@@ -154,6 +154,24 @@ ggplot(pca_df, aes(x = PC1, y = PC2, color = Construct, label = Sample)) +
   geom_text(vjust = -0.5, size = 3) +
   theme_bw() +
   labs(title = "PCA of Raw Counts (log2 transformed)")
+
+# Compute Euclidean distance from centroid (PC1+PC2) to identify outliers
+centroid <- colMeans(pca_result$x[, 1:2])
+pca_df$dist_from_centroid <- sqrt(
+  (pca_result$x[, 1] - centroid[1])^2 +
+  (pca_result$x[, 2] - centroid[2])^2
+)
+pca_df_sorted <- pca_df[order(-pca_df$dist_from_centroid), ]
+cat("Samples ranked by distance from PCA centroid (PC1+PC2):\n")
+cat(sprintf("  %-12s  %-10s  %-10s  %s\n", "Sample", "Construct", "Distance", "Outlier?"))
+cat(strrep("-", 52), "\n")
+for (i in seq_len(nrow(pca_df_sorted))) {
+  snum <- as.integer(pca_df_sorted$Sample[i])
+  flag <- if (!is.na(snum) && snum %in% outlier_samples) " <-- OUTLIER" else ""
+  cat(sprintf("  %-12s  %-10s  %10.2f  %s\n",
+              pca_df_sorted$Sample[i], pca_df_sorted$Construct[i],
+              pca_df_sorted$dist_from_centroid[i], flag))
+}
 ```
 
 ## DESeq2 Normalization and Differential Expression
