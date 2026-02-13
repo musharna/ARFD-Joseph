@@ -714,18 +714,18 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   }
 
   # --- Summary table ---
-  recovery_df <- do.call(rbind, recovery_rows)
+  recovery_df <- dplyr::bind_rows(recovery_rows)
   cat("=== DEG Recovery Summary ===\n")
-  print(recovery_df)
+  print(as.data.frame(recovery_df))
 
   # --- Stacked bar: category breakdown of missed DEGs per construct ---
-  detail_all <- do.call(rbind, missed_detail)
+  detail_all <- dplyr::bind_rows(missed_detail)
 
   if (!is.null(detail_all) && nrow(detail_all) > 0) {
     cat_counts <- detail_all %>%
-      count(Construct, Category) %>%
-      group_by(Construct) %>%
-      mutate(Pct = round(100 * n / sum(n), 1))
+      dplyr::count(Construct, Category) %>%
+      dplyr::group_by(Construct) %>%
+      dplyr::mutate(Pct = round(100 * n / sum(n), 1))
 
     p_bar <- ggplot(cat_counts, aes(x = Construct, y = n, fill = Category)) +
       geom_col(position = "stack") +
@@ -745,7 +745,8 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     # --- LFC comparison scatter per construct ---
     # For missed genes where we have our own LFC, plot Joseph LFC vs Our LFC
     scatter_data <- detail_all %>%
-      filter(!is.na(my_lfc) & !is.na(joseph_lfc))
+      dplyr::mutate(joseph_lfc = as.numeric(joseph_lfc)) %>%
+      dplyr::filter(!is.na(my_lfc) & !is.na(joseph_lfc))
 
     if (nrow(scatter_data) > 0) {
       p_scatter <- ggplot(scatter_data,
@@ -769,10 +770,11 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     # --- Summary: median Joseph LFC for missed genes by category ---
     cat("\n=== Median |Joseph LFC| for missed genes by category ===\n")
     detail_all %>%
-      group_by(Construct, Category) %>%
-      summarise(n = n(),
-                median_joseph_lfc = round(median(abs(joseph_lfc), na.rm = TRUE), 2),
-                .groups = "drop") %>%
+      dplyr::group_by(Construct, Category) %>%
+      dplyr::summarise(n = n(),
+                       median_joseph_lfc = round(median(abs(as.numeric(joseph_lfc)), na.rm = TRUE), 2),
+                       .groups = "drop") %>%
+      as.data.frame() %>%
       print()
   }
 
