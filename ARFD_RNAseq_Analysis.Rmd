@@ -761,11 +761,20 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     }
 
     # --- Summary: median Joseph LFC for missed genes by category ---
+    cat("\n=== detail_all diagnostics ===\n")
+    cat("nrow:", nrow(detail_all), "\n")
+    cat("columns:", paste(colnames(detail_all), collapse = ", "), "\n")
+    cat("joseph_lfc NA:", sum(is.na(as.numeric(detail_all$joseph_lfc))),
+        "/", nrow(detail_all), "\n")
+    cat("Category values:", paste(unique(detail_all$Category), collapse = ", "), "\n")
+
     cat("\n=== Median |Joseph LFC| for missed genes by category ===\n")
+    detail_all$joseph_lfc_num <- as.numeric(detail_all$joseph_lfc)
     lfc_summary <- aggregate(
-      abs(as.numeric(joseph_lfc)) ~ Construct + Category,
-      data = detail_all,
-      FUN  = function(x) round(median(x, na.rm = TRUE), 2)
+      abs(joseph_lfc_num) ~ Construct + Category,
+      data      = detail_all,
+      FUN       = function(x) round(median(x, na.rm = TRUE), 2),
+      na.action = na.pass
     )
     names(lfc_summary)[3] <- "median_joseph_lfc"
     lfc_summary$n <- as.integer(table(
