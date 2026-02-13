@@ -606,6 +606,9 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   pairs <- Filter(function(p) p$con %in% treatment_constructs, pairs)
   cat("Constructs to process:", paste(sapply(pairs, `[[`, "con"), collapse=", "), "\n\n")
 
+  # Uppercase gene IDs from Joseph's file for consistent matching
+  joseph_ids <- toupper(trimws(joseph_clusters$Geneid))
+
   recovery_rows <- list()
   missed_detail <- list()
 
