@@ -591,10 +591,14 @@ if (!is.na(joseph_file) && "Cluster" %in% colnames(df2)) {
 if (!is.na(joseph_file) && exists("joseph_clusters") &&
     "Geneid" %in% colnames(joseph_clusters) && exists("de_results_list")) {
 
-  # Map construct codes to display names
-  construct_labels <- c(
-    GUSaux_A = "GUS_aux", `5D_A` = "ARF5Δ", `6D_A` = "ARF6Δ",
-    `7D_A` = "ARF7Δ",   `8D_A` = "ARF8Δ",  `19D_A` = "ARF19Δ"
+  # Map OUR construct codes → Joseph's column suffix and display label
+  # Our codes:   GUS_aux, 5D, 6D, 7D, 8D, 19D
+  # Joseph cols: GUSaux_A, 5D_A, 6D_A, 7D_A, 8D_A, 19D_A
+  construct_map <- data.frame(
+    my_code  = treatment_constructs,
+    j_suffix = c("GUSaux_A", "5D_A", "6D_A", "7D_A", "8D_A", "19D_A"),
+    label    = c("GUS_aux",  "ARF5Δ","ARF6Δ","ARF7Δ","ARF8Δ","ARF19Δ"),
+    stringsAsFactors = FALSE
   )
 
   # Normalise Geneids for matching
@@ -603,13 +607,20 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
   recovery_rows  <- list()
   missed_detail  <- list()
 
-  for (con in treatment_constructs) {
-    j_col  <- paste0("Up_Down-", con)
-    j_lfc  <- paste0("log2FoldChange-", con)
-    j_padj <- paste0("padj-", con)
-    my_col <- paste0("Up_Down-", con)
+  for (i in seq_len(nrow(construct_map))) {
+    con       <- construct_map$my_code[i]
+    j_suffix  <- construct_map$j_suffix[i]
+    con_label <- construct_map$label[i]
 
-    if (!j_col %in% colnames(joseph_clusters)) next
+    j_col  <- paste0("Up_Down-",        j_suffix)
+    j_lfc  <- paste0("log2FoldChange-", j_suffix)
+    j_padj <- paste0("padj-",           j_suffix)
+    my_col <- paste0("Up_Down-",        con)
+
+    if (!j_col %in% colnames(joseph_clusters)) {
+      cat("Column not found in Joseph's file:", j_col, "\n")
+      next
+    }
 
     # Joseph DEGs for this construct
     j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
@@ -624,7 +635,7 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     missed <- setdiff(j_degs, my_degs)
 
     recovery_rows[[con]] <- data.frame(
-      Construct    = construct_labels[con],
+      Construct    = con_label,
       Joseph_UP    = length(j_up),
       My_UP        = length(my_up),
       Joseph_Down  = length(j_down),
@@ -659,8 +670,7 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
       detail <- full_res %>%
         left_join(joseph_lfc_vals, by = "Geneid_upper") %>%
         mutate(
-          Construct = construct_labels[con],
-          # Why missed?
+          Construct = con_label,
           Category = case_when(
             is.na(my_lfc)                              ~ "Not in our data\n(low counts / filtered)",
             is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high\n(not significant)",
