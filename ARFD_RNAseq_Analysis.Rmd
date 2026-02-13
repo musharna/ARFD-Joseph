@@ -692,12 +692,26 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
 
   # --- Summary table ---
   cat("recovery_rows length after loop:", length(recovery_rows), "\n")
-  recovery_df <- do.call(rbind, recovery_rows)
+  recovery_df <- do.call(rbind, lapply(recovery_rows, as.data.frame))
+  rownames(recovery_df) <- NULL
+  cat("recovery_df class:", class(recovery_df), "| nrow:", nrow(recovery_df), "\n\n")
+
   cat("=== DEG Recovery Summary ===\n")
-  print(recovery_df)
+  cat(sprintf("%-10s  %9s  %6s  %11s  %8s  %7s  %s\n",
+              "Construct","Joseph_UP","My_UP","Joseph_Down","My_Down","Missed","Recovery%"))
+  cat(strrep("-", 72), "\n")
+  for (i in seq_len(nrow(recovery_df))) {
+    cat(sprintf("%-10s  %9d  %6d  %11d  %8d  %7d  %.1f%%\n",
+                recovery_df$Construct[i],
+                recovery_df$Joseph_UP[i],   recovery_df$My_UP[i],
+                recovery_df$Joseph_Down[i], recovery_df$My_Down[i],
+                recovery_df$Missed_total[i], recovery_df$Recovery_pct[i]))
+  }
+  write.csv(recovery_df, "DEG_Recovery_Summary.csv", row.names = FALSE)
 
   # --- Stacked bar: category breakdown of missed DEGs per construct ---
-  detail_all <- do.call(rbind, missed_detail)
+  detail_all <- do.call(rbind, lapply(missed_detail, as.data.frame))
+  if (!is.null(detail_all)) rownames(detail_all) <- NULL
 
   if (!is.null(detail_all) && nrow(detail_all) > 0) {
     ct <- as.data.frame(table(Construct = detail_all$Construct,
