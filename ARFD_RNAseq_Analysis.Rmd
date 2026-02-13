@@ -584,6 +584,162 @@ if (!is.na(joseph_file) && "Cluster" %in% colnames(df2)) {
 }
 ```
 
+### DEG Recovery Analysis — Why Were Joseph's DEGs Missed?
+
+```{r deg_recovery_analysis, fig.width=12, fig.height=8}
+# Requires: joseph_clusters loaded above, de_results_list (full DESeq2 results), df2
+if (!is.na(joseph_file) && exists("joseph_clusters") &&
+    "Geneid" %in% colnames(joseph_clusters) && exists("de_results_list")) {
+
+  # Map construct codes to display names
+  construct_labels <- c(
+    GUSaux_A = "GUS_aux", `5D_A` = "ARF5Δ", `6D_A` = "ARF6Δ",
+    `7D_A` = "ARF7Δ",   `8D_A` = "ARF8Δ",  `19D_A` = "ARF19Δ"
+  )
+
+  # Normalise Geneids for matching
+  joseph_ids <- toupper(trimws(joseph_clusters$Geneid))
+
+  recovery_rows  <- list()
+  missed_detail  <- list()
+
+  for (con in treatment_constructs) {
+    j_col  <- paste0("Up_Down-", con)
+    j_lfc  <- paste0("log2FoldChange-", con)
+    j_padj <- paste0("padj-", con)
+    my_col <- paste0("Up_Down-", con)
+
+    if (!j_col %in% colnames(joseph_clusters)) next
+
+    # Joseph DEGs for this construct
+    j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
+    j_down <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "Down"]
+    j_degs <- union(j_up, j_down)
+
+    # Our DEGs (from df2 Up_Down col)
+    my_up   <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "UP"]))
+    my_down <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "Down"]))
+    my_degs <- union(my_up, my_down)
+
+    missed <- setdiff(j_degs, my_degs)
+
+    recovery_rows[[con]] <- data.frame(
+      Construct    = construct_labels[con],
+      Joseph_UP    = length(j_up),
+      My_UP        = length(my_up),
+      Joseph_Down  = length(j_down),
+      My_Down      = length(my_down),
+      Missed_total = length(missed),
+      Recovery_pct = round(100 * length(intersect(j_degs, my_degs)) / max(length(j_degs), 1), 1),
+      stringsAsFactors = FALSE
+    )
+
+    # --- Categorise each missed gene using OUR full DESeq2 results ---
+    full_res <- de_results_list[[con]]
+    if (!is.null(full_res)) {
+      full_res <- full_res %>%
+        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
+        filter(Geneid_upper %in% missed)
+
+      lfc_col_full  <- paste0("log2FoldChange-", con)
+      padj_col_full <- paste0("padj-", con)
+
+      full_res <- full_res %>%
+        rename(my_lfc  = all_of(lfc_col_full),
+               my_padj = all_of(padj_col_full))
+
+      # Also pull Joseph's LFC for these missed genes
+      joseph_lfc_vals <- joseph_clusters %>%
+        mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
+        filter(Geneid_upper %in% missed) %>%
+        dplyr::select(Geneid_upper,
+                      joseph_lfc  = all_of(j_lfc),
+                      joseph_padj = all_of(j_padj))
+
+      detail <- full_res %>%
+        left_join(joseph_lfc_vals, by = "Geneid_upper") %>%
+        mutate(
+          Construct = construct_labels[con],
+          # Why missed?
+          Category = case_when(
+            is.na(my_lfc)                              ~ "Not in our data\n(low counts / filtered)",
+            is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high\n(not significant)",
+            abs(my_lfc) < lfc_threshold                ~ paste0("LFC below threshold\n(|LFC| < ", lfc_threshold, ")"),
+            TRUE                                       ~ "Other"
+          )
+        )
+      missed_detail[[con]] <- detail
+    }
+  }
+
+  # --- Summary table ---
+  recovery_df <- do.call(rbind, recovery_rows)
+  cat("=== DEG Recovery Summary ===\n")
+  print(recovery_df)
+
+  # --- Stacked bar: category breakdown of missed DEGs per construct ---
+  detail_all <- do.call(rbind, missed_detail)
+
+  if (!is.null(detail_all) && nrow(detail_all) > 0) {
+    cat_counts <- detail_all %>%
+      count(Construct, Category) %>%
+      group_by(Construct) %>%
+      mutate(Pct = round(100 * n / sum(n), 1))
+
+    p_bar <- ggplot(cat_counts, aes(x = Construct, y = n, fill = Category)) +
+      geom_col(position = "stack") +
+      geom_text(aes(label = ifelse(n > 30, n, "")),
+                position = position_stack(vjust = 0.5), size = 3, colour = "white") +
+      scale_fill_brewer(palette = "Set2") +
+      labs(title = "Why Were Joseph's DEGs Not Recovered?",
+           subtitle = paste0("Genes called DEG by Joseph but NOT by our analysis ",
+                             "(LFC≥", lfc_threshold, ", padj≤", padj_threshold, ")"),
+           x = NULL, y = "Number of missed genes", fill = "Reason") +
+      theme_bw(base_size = 13) +
+      theme(legend.position = "right")
+
+    print(p_bar)
+    ggsave("DEG_Recovery_Breakdown.svg", p_bar, width = 10, height = 6)
+
+    # --- LFC comparison scatter per construct ---
+    # For missed genes where we have our own LFC, plot Joseph LFC vs Our LFC
+    scatter_data <- detail_all %>%
+      filter(!is.na(my_lfc) & !is.na(joseph_lfc))
+
+    if (nrow(scatter_data) > 0) {
+      p_scatter <- ggplot(scatter_data,
+                          aes(x = joseph_lfc, y = my_lfc, colour = Category)) +
+        geom_point(alpha = 0.4, size = 1.2) +
+        geom_hline(yintercept =  c(-lfc_threshold, lfc_threshold),
+                   linetype = "dashed", colour = "grey40") +
+        geom_vline(xintercept = c(-lfc_threshold, lfc_threshold),
+                   linetype = "dashed", colour = "grey40") +
+        facet_wrap(~Construct, scales = "free") +
+        scale_colour_brewer(palette = "Set2") +
+        labs(title = "LFC comparison for Joseph's DEGs not recovered by our analysis",
+             x = "Joseph log2FoldChange", y = "Our log2FoldChange",
+             colour = "Reason not called") +
+        theme_bw(base_size = 11)
+
+      print(p_scatter)
+      ggsave("DEG_Recovery_LFC_Scatter.svg", p_scatter, width = 14, height = 10)
+    }
+
+    # --- Summary: median Joseph LFC for missed genes by category ---
+    cat("\n=== Median |Joseph LFC| for missed genes by category ===\n")
+    detail_all %>%
+      group_by(Construct, Category) %>%
+      summarise(n = n(),
+                median_joseph_lfc = round(median(abs(joseph_lfc), na.rm = TRUE), 2),
+                .groups = "drop") %>%
+      print()
+  }
+
+} else {
+  cat("DEG recovery analysis requires: joseph_clusters (from cluster_comparison chunk) and de_results_list (from differential_expression chunk).\n")
+}
+```
+
 ```{r heatmap_auxin_responsive, fig.width=10, fig.height=6}
 # Filter for genes differentially expressed in GUS_aux vs GUS
 df_auxin_responsive <- df2 %>%
