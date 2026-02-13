@@ -619,98 +619,92 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
     jsuf      <- p$jsuf
     con_label <- p$label
 
-    tryCatch({
-      j_col  <- paste0("Up_Down-",        jsuf)
-      j_lfc  <- paste0("log2FoldChange-", jsuf)
-      j_padj <- paste0("padj-",           jsuf)
-      my_col <- paste0("Up_Down-",        con)
+    j_col  <- paste0("Up_Down-",        jsuf)
+    j_lfc  <- paste0("log2FoldChange-", jsuf)
+    j_padj <- paste0("padj-",           jsuf)
+    my_col <- paste0("Up_Down-",        con)
 
-      cat("Processing", con_label, "| j_col:", j_col, "| my_col:", my_col, "\n")
+    cat("Processing", con_label, "| j_col:", j_col, "| my_col:", my_col, "\n")
 
-      if (!j_col %in% colnames(joseph_clusters)) {
-        cat("  SKIP: column", j_col, "not found in Joseph's file\n"); return(invisible(NULL))
-      }
-      if (!my_col %in% colnames(df2)) {
-        cat("  SKIP: column", my_col, "not found in df2\n"); return(invisible(NULL))
-      }
+    if (!j_col %in% colnames(joseph_clusters)) {
+      cat("  SKIP: column", j_col, "not found in Joseph's file\n")
+      next
+    }
+    if (!my_col %in% colnames(df2)) {
+      cat("  SKIP: column", my_col, "not found in df2\n")
+      next
+    }
 
-      # Joseph DEGs for this construct
-      j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
-      j_down <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "Down"]
-      j_degs <- union(j_up, j_down)
-      cat("  Joseph DEGs: UP=", length(j_up), "Down=", length(j_down), "\n")
+    # Joseph DEGs for this construct
+    j_up   <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "UP"]
+    j_down <- joseph_ids[!is.na(joseph_clusters[[j_col]]) & joseph_clusters[[j_col]] == "Down"]
+    j_degs <- union(j_up, j_down)
+    cat("  Joseph DEGs: UP=", length(j_up), "Down=", length(j_down), "\n")
 
-      # Our DEGs
-      my_up   <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "UP"]))
-      my_down <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "Down"]))
-      my_degs <- union(my_up, my_down)
-      cat("  Our DEGs:    UP=", length(my_up), "Down=", length(my_down), "\n")
+    # Our DEGs
+    my_up   <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "UP"]))
+    my_down <- toupper(trimws(df2$Geneid[!is.na(df2[[my_col]]) & df2[[my_col]] == "Down"]))
+    my_degs <- union(my_up, my_down)
+    cat("  Our DEGs:    UP=", length(my_up), "Down=", length(my_down), "\n")
 
-      missed <- setdiff(j_degs, my_degs)
+    missed <- setdiff(j_degs, my_degs)
+    cat("  Missed:", length(missed), "\n")
 
-      recovery_rows[[con]] <- data.frame(
-        Construct    = con_label,
-        Joseph_UP    = length(j_up),
-        My_UP        = length(my_up),
-        Joseph_Down  = length(j_down),
-        My_Down      = length(my_down),
-        Missed_total = length(missed),
-        Recovery_pct = round(100 * length(intersect(j_degs, my_degs)) / max(length(j_degs), 1), 1),
-        stringsAsFactors = FALSE
-      )
+    recovery_rows[[con]] <- data.frame(
+      Construct    = con_label,
+      Joseph_UP    = length(j_up),
+      My_UP        = length(my_up),
+      Joseph_Down  = length(j_down),
+      My_Down      = length(my_down),
+      Missed_total = length(missed),
+      Recovery_pct = round(100 * length(intersect(j_degs, my_degs)) / max(length(j_degs), 1), 1),
+      stringsAsFactors = FALSE
+    )
+    cat("  recovery_rows entries so far:", length(recovery_rows), "\n")
 
-      # Categorise missed genes using full DESeq2 results
-      full_res <- de_results_list[[con]]
-      if (!is.null(full_res) && length(missed) > 0) {
-        lfc_col_full  <- paste0("log2FoldChange-", con)
-        padj_col_full <- paste0("padj-", con)
+    # Categorise missed genes using full DESeq2 results
+    full_res <- de_results_list[[con]]
+    if (!is.null(full_res) && length(missed) > 0) {
+      lfc_col_full  <- paste0("log2FoldChange-", con)
+      padj_col_full <- paste0("padj-", con)
 
-        fr <- full_res %>%
-          dplyr::mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
-          dplyr::filter(Geneid_upper %in% missed) %>%
-          dplyr::select(Geneid_upper,
-                        my_lfc  = all_of(lfc_col_full),
-                        my_padj = all_of(padj_col_full))
+      fr <- full_res[toupper(trimws(full_res$Geneid)) %in% missed,
+                     c("Geneid", lfc_col_full, padj_col_full)]
+      colnames(fr) <- c("Geneid_upper", "my_lfc", "my_padj")
+      fr$Geneid_upper <- toupper(trimws(fr$Geneid_upper))
 
-        jlv <- joseph_clusters %>%
-          dplyr::mutate(Geneid_upper = toupper(trimws(Geneid))) %>%
-          dplyr::filter(Geneid_upper %in% missed) %>%
-          dplyr::select(Geneid_upper,
-                        joseph_lfc  = all_of(j_lfc),
-                        joseph_padj = all_of(j_padj))
+      jlv <- joseph_clusters[toupper(trimws(joseph_clusters$Geneid)) %in% missed,
+                              c("Geneid", j_lfc, j_padj)]
+      colnames(jlv) <- c("Geneid_upper", "joseph_lfc", "joseph_padj")
+      jlv$Geneid_upper <- toupper(trimws(jlv$Geneid_upper))
+      jlv$joseph_lfc   <- as.numeric(jlv$joseph_lfc)
 
-        detail <- fr %>%
-          dplyr::left_join(jlv, by = "Geneid_upper") %>%
-          dplyr::mutate(
-            joseph_lfc = as.numeric(joseph_lfc),
-            Construct  = con_label,
-            Category   = dplyr::case_when(
-              is.na(my_lfc)                              ~ "Not in our data",
-              is.na(my_padj) | my_padj > padj_threshold ~ "Padj too high",
-              abs(my_lfc) < lfc_threshold                ~ "LFC below threshold",
-              TRUE                                       ~ "Other"
-            )
-          )
-        missed_detail[[con]] <- detail
-      }
-    }, error = function(e) {
-      cat("  ERROR in", con_label, ":", conditionMessage(e), "\n")
-    })
+      detail <- merge(fr, jlv, by = "Geneid_upper", all.x = TRUE)
+      detail$Construct <- con_label
+      detail$Category  <- ifelse(
+        is.na(detail$my_lfc),                                    "Not in our data",
+        ifelse(is.na(detail$my_padj) | detail$my_padj > padj_threshold, "Padj too high",
+        ifelse(abs(detail$my_lfc) < lfc_threshold,               "LFC below threshold",
+                                                                  "Other")))
+      missed_detail[[con]] <- detail
+    }
   }
 
   # --- Summary table ---
-  recovery_df <- dplyr::bind_rows(recovery_rows)
+  cat("recovery_rows length after loop:", length(recovery_rows), "\n")
+  recovery_df <- do.call(rbind, recovery_rows)
   cat("=== DEG Recovery Summary ===\n")
-  print(as.data.frame(recovery_df))
+  print(recovery_df)
 
   # --- Stacked bar: category breakdown of missed DEGs per construct ---
-  detail_all <- dplyr::bind_rows(missed_detail)
+  detail_all <- do.call(rbind, missed_detail)
 
   if (!is.null(detail_all) && nrow(detail_all) > 0) {
-    cat_counts <- detail_all %>%
-      dplyr::count(Construct, Category) %>%
-      dplyr::group_by(Construct) %>%
-      dplyr::mutate(Pct = round(100 * n / sum(n), 1))
+    ct <- as.data.frame(table(Construct = detail_all$Construct,
+                               Category  = detail_all$Category))
+    ct <- ct[ct$Freq > 0, ]
+    cat_counts <- ct
+    names(cat_counts)[names(cat_counts) == "Freq"] <- "n"
 
     p_bar <- ggplot(cat_counts, aes(x = Construct, y = n, fill = Category)) +
       geom_col(position = "stack") +
@@ -754,13 +748,16 @@ if (!is.na(joseph_file) && exists("joseph_clusters") &&
 
     # --- Summary: median Joseph LFC for missed genes by category ---
     cat("\n=== Median |Joseph LFC| for missed genes by category ===\n")
-    detail_all %>%
-      dplyr::group_by(Construct, Category) %>%
-      dplyr::summarise(n = n(),
-                       median_joseph_lfc = round(median(abs(as.numeric(joseph_lfc)), na.rm = TRUE), 2),
-                       .groups = "drop") %>%
-      as.data.frame() %>%
-      print()
+    lfc_summary <- aggregate(
+      abs(as.numeric(joseph_lfc)) ~ Construct + Category,
+      data = detail_all,
+      FUN  = function(x) round(median(x, na.rm = TRUE), 2)
+    )
+    names(lfc_summary)[3] <- "median_joseph_lfc"
+    lfc_summary$n <- as.integer(table(
+      paste(detail_all$Construct, detail_all$Category)
+    )[paste(lfc_summary$Construct, lfc_summary$Category)])
+    print(lfc_summary)
   }
 
 } else {
