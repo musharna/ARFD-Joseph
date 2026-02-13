@@ -263,18 +263,20 @@ for (con in treatment_constructs) {
 ```{r classify_updown}
 # Loop over treatment constructs to classify Up/Down
 for (con in treatment_constructs) {
-  l2fc_col <- paste0("log2FoldChange-", con)
-  padj_col <- paste0("padj-", con)
-  avg_col <- paste0("avg_reads-", con)
-  up_down_col <- paste0("Up_Down-", con)
+  l2fc_col     <- paste0("log2FoldChange-", con)
+  padj_col     <- paste0("padj-",           con)
+  basemean_col <- paste0("baseMean-",        con)
+  up_down_col  <- paste0("Up_Down-",         con)
 
   # Classify based on thresholds (matches Joseph's pipeline):
   # - padj < threshold
   # - |log2FoldChange| > lfc_threshold
+  # - baseMean > 20 (matches Joseph's baseMean > 20 filter)
   df2[[up_down_col]] <- ifelse(
     !is.na(df2[[padj_col]]) &
       df2[[padj_col]] < padj_threshold &
-      abs(df2[[l2fc_col]]) > lfc_threshold,
+      abs(df2[[l2fc_col]]) > lfc_threshold &
+      !is.na(df2[[basemean_col]]) & df2[[basemean_col]] > 20,
     ifelse(df2[[l2fc_col]] > 0, "UP", "Down"),
     ""
   )
